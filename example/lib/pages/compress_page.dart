@@ -103,7 +103,6 @@ class _CompressPageState extends State<CompressPage> {
         thumb =
             await _compressor.getThumbnail(path, positionMs: 0, maxWidth: 320);
       } catch (_) {}
-      // Target size can't exceed the source; clamp the current pick down.
       final srcMB = (info.sizeBytes / 1024 / 1024).ceil();
       setState(() {
         _videoInfo = info;
