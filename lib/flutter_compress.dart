@@ -42,18 +42,19 @@ class FlutterCompress {
   FlutterCompressPlatform get _platform => FlutterCompressPlatform.instance;
 
   int _counter = 0;
-  String _newId() => 'job_${DateTime.now().microsecondsSinceEpoch}_${_counter++}';
+  String _newId() =>
+      'job_${DateTime.now().microsecondsSinceEpoch}_${_counter++}';
 
   /// Broadcast progress for every job. Prefer the per-call [onProgress]
   /// callback in [compress] unless you need a global feed (e.g. batch UI).
   Stream<CompressionProgress> get progressStream => _platform.progressStream;
 
   /// Probe a source video's metadata.
-  Future<VideoInfo> getVideoInfo(String path) =>
-      _platform.getVideoInfo(path);
+  Future<VideoInfo> getVideoInfo(String path) => _platform.getVideoInfo(path);
 
   /// Estimate the output size/bitrate for [config] without encoding.
-  Future<CompressionEstimate> estimate(String path, VideoCompressConfig config) =>
+  Future<CompressionEstimate> estimate(
+          String path, VideoCompressConfig config) =>
       _platform.estimate(path, config);
 
   /// Compress a single video.
@@ -115,9 +116,7 @@ class FlutterCompress {
       results.add(await compress(
         paths[i],
         config,
-        onProgress: onItemProgress == null
-            ? null
-            : (p) => onItemProgress(i, p),
+        onProgress: onItemProgress == null ? null : (p) => onItemProgress(i, p),
         cancellationToken: cancellationToken,
         outputDirectory: outputDirectory,
       ));

@@ -9,8 +9,7 @@ import 'src/models.dart';
 /// single source of truth. (If this plugin grows, these hand-written maps are
 /// the natural point to migrate to Pigeon for compile-time-checked messages.)
 class MethodChannelFlutterCompress extends FlutterCompressPlatform {
-  final MethodChannel _method =
-      const MethodChannel('flutter_compress/methods');
+  final MethodChannel _method = const MethodChannel('flutter_compress/methods');
   final EventChannel _progress =
       const EventChannel('flutter_compress/progress');
 

@@ -7,8 +7,7 @@ than opaque quality presets.
 
 > 中文文档见 [README.zh-CN.md](README.zh-CN.md)。
 
-**🌐 Live web demo — try it right in your browser:**
-<https://flutter-compress.ckdgdgdg.workers.dev/>
+**🌐 [Try the live web demo in your browser →](https://flutter-compress.ckdgdgdg.workers.dev/)**
 
 - **Android** → Media3 `Transformer` (Google-maintained, hardware-accelerated)
 - **iOS** → explicit `AVAssetReader`/`AVAssetWriter` pipeline (real bitrate control)

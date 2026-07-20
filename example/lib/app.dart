@@ -55,11 +55,16 @@ class _DemoAppState extends State<DemoApp> {
   }
 
   Future<void> toggleTheme() async {
-    setState(() => _themeMode =
-        _themeMode == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark);
+    setState(
+      () => _themeMode = _themeMode == ThemeMode.dark
+          ? ThemeMode.light
+          : ThemeMode.dark,
+    );
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(
-        _themeKey, _themeMode == ThemeMode.dark ? 'dark' : 'light');
+      _themeKey,
+      _themeMode == ThemeMode.dark ? 'dark' : 'light',
+    );
   }
 
   @override

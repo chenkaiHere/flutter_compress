@@ -78,7 +78,10 @@ class QualitySection extends StatelessWidget {
             )
           else ...[
             ValueReadout(
-                label: l10n.qualityPercent, value: '$qualityPercent', unit: '%'),
+              label: l10n.qualityPercent,
+              value: '$qualityPercent',
+              unit: '%',
+            ),
             Slider(
               value: qualityPercent.toDouble(),
               min: 1,
@@ -88,8 +91,10 @@ class QualitySection extends StatelessWidget {
             ),
             Align(
               alignment: AlignmentDirectional.centerStart,
-              child:
-                  Text('1%', style: TextStyle(color: c.textMuted, fontSize: 11)),
+              child: Text(
+                '1%',
+                style: TextStyle(color: c.textMuted, fontSize: 11),
+              ),
             ),
           ],
         ],

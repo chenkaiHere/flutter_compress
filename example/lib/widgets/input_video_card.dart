@@ -40,9 +40,13 @@ class InputVideoCard extends StatelessWidget {
             children: [
               Icon(Icons.video_call_outlined, color: c.accent, size: 34),
               const SizedBox(height: 10),
-              Text(l10n.pickVideo,
-                  style: TextStyle(
-                      color: c.textPrimary, fontWeight: FontWeight.w600)),
+              Text(
+                l10n.pickVideo,
+                style: TextStyle(
+                  color: c.textPrimary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ],
           ),
         ),
@@ -61,27 +65,35 @@ class InputVideoCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(l10n.inputVideo,
-                        style: TextStyle(color: c.textMuted, fontSize: 11)),
+                    Text(
+                      l10n.inputVideo,
+                      style: TextStyle(color: c.textMuted, fontSize: 11),
+                    ),
                     const SizedBox(height: 3),
                     Text(
                       inputPath!.split('/').last,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                          color: c.textPrimary,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700),
+                        color: c.textPrimary,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     if (info != null)
-                      Wrap(spacing: 6, runSpacing: 6, children: [
-                        LabelChip(_resLabel(info!)),
-                        LabelChip(
-                            '${(info!.sizeBytes / 1024 / 1024).toStringAsFixed(0)} MB'),
-                        if (info!.codec != null)
-                          LabelChip(info!.codec!.toUpperCase()),
-                      ]),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: [
+                          LabelChip(_resLabel(info!)),
+                          LabelChip(
+                            '${(info!.sizeBytes / 1024 / 1024).toStringAsFixed(0)} MB',
+                          ),
+                          if (info!.codec != null)
+                            LabelChip(info!.codec!.toUpperCase()),
+                        ],
+                      ),
                   ],
                 ),
               ),
@@ -118,12 +130,15 @@ class _Thumbnail extends StatelessWidget {
             child: thumbPath != null
                 // Web thumbnails are data: URLs; native ones are file paths.
                 ? (kIsWeb
-                    ? Image.network(thumbPath!, fit: BoxFit.cover)
-                    : Image.file(File(thumbPath!), fit: BoxFit.cover))
+                      ? Image.network(thumbPath!, fit: BoxFit.cover)
+                      : Image.file(File(thumbPath!), fit: BoxFit.cover))
                 : DecoratedBox(
                     decoration: BoxDecoration(gradient: c.thumbGradient),
-                    child: const Icon(Icons.play_arrow_rounded,
-                        color: Colors.white, size: 30),
+                    child: const Icon(
+                      Icons.play_arrow_rounded,
+                      color: Colors.white,
+                      size: 30,
+                    ),
                   ),
           ),
           if (info != null)
@@ -136,11 +151,14 @@ class _Thumbnail extends StatelessWidget {
                   color: Colors.black.withValues(alpha: 0.6),
                   borderRadius: BorderRadius.circular(6),
                 ),
-                child: Text(_fmtDuration(info!.durationMs),
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600)),
+                child: Text(
+                  _fmtDuration(info!.durationMs),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
             ),
         ],

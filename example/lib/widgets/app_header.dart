@@ -39,22 +39,30 @@ class AppHeader extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('COMPRESSOR',
-                    style: TextStyle(
-                        color: c.accent,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 4)),
+                Text(
+                  'COMPRESSOR',
+                  style: TextStyle(
+                    color: c.accent,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 4,
+                  ),
+                ),
                 const SizedBox(height: 2),
-                Text(l10n.appTitle,
-                    style: TextStyle(
-                        color: c.textPrimary,
-                        fontSize: 26,
-                        fontWeight: FontWeight.w800,
-                        height: 1.1)),
+                Text(
+                  l10n.appTitle,
+                  style: TextStyle(
+                    color: c.textPrimary,
+                    fontSize: 26,
+                    fontWeight: FontWeight.w800,
+                    height: 1.1,
+                  ),
+                ),
                 const SizedBox(height: 6),
-                Text(l10n.tagline,
-                    style: TextStyle(color: c.textSecondary, fontSize: 12)),
+                Text(
+                  l10n.tagline,
+                  style: TextStyle(color: c.textSecondary, fontSize: 12),
+                ),
               ],
             ),
           ),
@@ -85,14 +93,18 @@ class _LanguageMenu extends StatelessWidget {
           DemoApp.setLocale(context, v.isEmpty ? null : Locale(v)),
       itemBuilder: (context) => [
         PopupMenuItem(
-            value: '',
-            child:
-                Text(l10n.systemDefault, style: TextStyle(color: c.textPrimary))),
+          value: '',
+          child: Text(
+            l10n.systemDefault,
+            style: TextStyle(color: c.textPrimary),
+          ),
+        ),
         const PopupMenuDivider(),
         for (final e in kLanguageNames.entries)
           PopupMenuItem(
-              value: e.key,
-              child: Text(e.value, style: TextStyle(color: c.textPrimary))),
+            value: e.key,
+            child: Text(e.value, style: TextStyle(color: c.textPrimary)),
+          ),
       ],
       child: const CircleIconButton(icon: Icons.language),
     );

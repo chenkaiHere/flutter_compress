@@ -56,8 +56,8 @@ class FlutterCompressWeb extends FlutterCompressPlatform {
     await _loadScript('${base}mp4-muxer.js');
     await _loadScript('${base}flutter_compress_web.js');
     if (!_jsIsSupported()) {
-      throw VideoCompressException(
-          'unsupported', 'WebCodecs / MP4 tooling not available in this browser');
+      throw VideoCompressException('unsupported',
+          'WebCodecs / MP4 tooling not available in this browser');
     }
   }
 
@@ -96,8 +96,7 @@ class FlutterCompressWeb extends FlutterCompressPlatform {
     final m = await _rawInfo(path);
     final srcW = (m['width'] as num).toInt();
     final srcH = (m['height'] as num).toInt();
-    final durationMs =
-        _clampDuration((m['durationMs'] as num).toInt(), config);
+    final durationMs = _clampDuration((m['durationMs'] as num).toInt(), config);
     final srcKbps = (m['bitrateKbps'] as num).toInt();
     final (tw, th) = _SizeMath.targetDimensions(srcW, srcH, config);
     final videoBps = _SizeMath.videoBitrateBps(config, durationMs, srcKbps, th);
@@ -236,7 +235,8 @@ class _SizeMath {
     final explicit = c.videoBitrateKbps;
     if (explicit != null) return explicit * 1000;
 
-    final percent = (c.qualityPercent ?? _presetPercent(c.quality)).clamp(1, 100);
+    final percent =
+        (c.qualityPercent ?? _presetPercent(c.quality)).clamp(1, 100);
     final srcBps = srcKbps * 1000;
     if (srcBps > 0) {
       return (srcBps * percent / 100).round().clamp(_minBps, srcBps);
@@ -259,7 +259,8 @@ class _SizeMath {
     }
   }
 
-  static (int, int) targetDimensions(int srcW, int srcH, VideoCompressConfig c) {
+  static (int, int) targetDimensions(
+      int srcW, int srcH, VideoCompressConfig c) {
     final m = c.alignment == DimensionAlignment.auto16 ? 16 : 2;
     if (srcW <= 0 || srcH <= 0) return (_align(srcW, m), _align(srcH, m));
     var w = srcW.toDouble();

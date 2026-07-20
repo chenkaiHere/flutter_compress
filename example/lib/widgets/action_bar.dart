@@ -30,16 +30,20 @@ class ActionBar extends StatelessWidget {
         Row(
           children: [
             Expanded(
-                child: GhostButton(
-                    icon: Icons.info_outline,
-                    label: l10n.actionInfo,
-                    onTap: busy ? null : onInfo)),
+              child: GhostButton(
+                icon: Icons.info_outline,
+                label: l10n.actionInfo,
+                onTap: busy ? null : onInfo,
+              ),
+            ),
             const SizedBox(width: 12),
             Expanded(
-                child: GhostButton(
-                    icon: Icons.calculate_outlined,
-                    label: l10n.actionEstimate,
-                    onTap: busy ? null : onEstimate)),
+              child: GhostButton(
+                icon: Icons.calculate_outlined,
+                label: l10n.actionEstimate,
+                onTap: busy ? null : onEstimate,
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 12),
@@ -75,12 +79,15 @@ class ProgressView extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 6),
-        Text('${(progress * 100).toStringAsFixed(0)}%',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-                color: c.textSecondary,
-                fontSize: 12,
-                fontFamilyFallback: kMonoFallback)),
+        Text(
+          '${(progress * 100).toStringAsFixed(0)}%',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: c.textSecondary,
+            fontSize: 12,
+            fontFamilyFallback: kMonoFallback,
+          ),
+        ),
       ],
     );
   }
@@ -102,10 +109,11 @@ class LogView extends StatelessWidget {
           child: Text(
             log,
             style: TextStyle(
-                color: c.textSecondary,
-                fontSize: 11.5,
-                height: 1.5,
-                fontFamilyFallback: kMonoFallback),
+              color: c.textSecondary,
+              fontSize: 11.5,
+              height: 1.5,
+              fontFamilyFallback: kMonoFallback,
+            ),
           ),
         ),
       ),

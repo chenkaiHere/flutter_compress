@@ -6,8 +6,7 @@ Flutter 高质量**视频压缩**插件 —— 覆盖 Android / iOS / Web,**不�
 
 > English docs: [README.md](README.md)
 
-**🌐 Web 版在线体验 —— 浏览器直接试用:**
-<https://flutter-compress.ckdgdgdg.workers.dev/>
+**🌐 [点此在浏览器中在线体验 Web 版 →](https://flutter-compress.ckdgdgdg.workers.dev/)**
 
 - **Android** → Media3 `Transformer`(Google 维护、硬件加速)
 - **iOS** → 手写 `AVAssetReader`/`AVAssetWriter` 管线(可精确控制码率)

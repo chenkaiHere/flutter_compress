@@ -39,17 +39,21 @@ class EstimateCard extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                  child: _Stat(
-                      label: l10n.estOutput,
-                      value: _outMB.toStringAsFixed(0),
-                      unit: 'MB',
-                      color: c.textPrimary)),
+                child: _Stat(
+                  label: l10n.estOutput,
+                  value: _outMB.toStringAsFixed(0),
+                  unit: 'MB',
+                  color: c.textPrimary,
+                ),
+              ),
               Expanded(
-                  child: _Stat(
-                      label: l10n.estSaved,
-                      value: _saved.toStringAsFixed(0),
-                      unit: '%',
-                      color: c.success)),
+                child: _Stat(
+                  label: l10n.estSaved,
+                  value: _saved.toStringAsFixed(0),
+                  unit: '%',
+                  color: c.success,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 16),
@@ -76,25 +80,31 @@ class EstimateCard extends StatelessWidget {
         children: [
           _header(context),
           const SizedBox(height: 22),
-          Text(l10n.estOutput,
-              style: TextStyle(color: c.textMuted, fontSize: 12)),
+          Text(
+            l10n.estOutput,
+            style: TextStyle(color: c.textMuted, fontSize: 12),
+          ),
           const SizedBox(height: 6),
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text(_outMB.toStringAsFixed(0),
-                  style: TextStyle(
-                    color: c.textPrimary,
-                    fontSize: 52,
-                    fontWeight: FontWeight.w800,
-                    height: 0.95,
-                    fontFamilyFallback: kMonoFallback,
-                  )),
+              Text(
+                _outMB.toStringAsFixed(0),
+                style: TextStyle(
+                  color: c.textPrimary,
+                  fontSize: 52,
+                  fontWeight: FontWeight.w800,
+                  height: 0.95,
+                  fontFamilyFallback: kMonoFallback,
+                ),
+              ),
               const SizedBox(width: 5),
               Padding(
                 padding: const EdgeInsets.only(bottom: 6),
-                child: Text('MB',
-                    style: TextStyle(color: c.textMuted, fontSize: 18)),
+                child: Text(
+                  'MB',
+                  style: TextStyle(color: c.textMuted, fontSize: 18),
+                ),
               ),
             ],
           ),
@@ -102,22 +112,30 @@ class EstimateCard extends StatelessWidget {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: c.success.withValues(alpha: 0.14),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Text('↓ ${_saved.toStringAsFixed(0)}%',
-                    style: TextStyle(
-                        color: c.success,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        fontFamilyFallback: kMonoFallback)),
+                child: Text(
+                  '↓ ${_saved.toStringAsFixed(0)}%',
+                  style: TextStyle(
+                    color: c.success,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    fontFamilyFallback: kMonoFallback,
+                  ),
+                ),
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: Text('${l10n.sourceLabel} ${srcMB.toStringAsFixed(0)} MB',
-                    style: TextStyle(color: c.textMuted, fontSize: 12)),
+                child: Text(
+                  '${l10n.sourceLabel} ${srcMB.toStringAsFixed(0)} MB',
+                  style: TextStyle(color: c.textMuted, fontSize: 12),
+                ),
               ),
             ],
           ),
@@ -132,7 +150,8 @@ class EstimateCard extends StatelessWidget {
                 alignment: Alignment.centerLeft,
                 widthFactor: ratio == 0 ? 0.02 : ratio,
                 child: DecoratedBox(
-                    decoration: BoxDecoration(gradient: c.accentGradient)),
+                  decoration: BoxDecoration(gradient: c.accentGradient),
+                ),
               ),
             ),
           ),
@@ -140,10 +159,14 @@ class EstimateCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(l10n.estOutput,
-                  style: TextStyle(color: c.textMuted, fontSize: 10)),
-              Text(l10n.sourceLabel,
-                  style: TextStyle(color: c.textMuted, fontSize: 10)),
+              Text(
+                l10n.estOutput,
+                style: TextStyle(color: c.textMuted, fontSize: 10),
+              ),
+              Text(
+                l10n.sourceLabel,
+                style: TextStyle(color: c.textMuted, fontSize: 10),
+              ),
             ],
           ),
           const Spacer(),
@@ -151,8 +174,10 @@ class EstimateCard extends StatelessWidget {
           const SizedBox(height: 8),
           _meter(context, f),
           const SizedBox(height: 12),
-          Text(f.hint,
-              style: TextStyle(color: c.textMuted, fontSize: 11, height: 1.5)),
+          Text(
+            f.hint,
+            style: TextStyle(color: c.textMuted, fontSize: 11, height: 1.5),
+          ),
         ],
       ),
     );
@@ -166,13 +191,18 @@ class EstimateCard extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(l10n.estimateTitle,
-            style: TextStyle(
-                color: c.textPrimary,
-                fontSize: 14,
-                fontWeight: FontWeight.w700)),
-        Text(l10n.estimateBasedOn,
-            style: TextStyle(color: c.textMuted, fontSize: 11)),
+        Text(
+          l10n.estimateTitle,
+          style: TextStyle(
+            color: c.textPrimary,
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        Text(
+          l10n.estimateBasedOn,
+          style: TextStyle(color: c.textMuted, fontSize: 11),
+        ),
       ],
     );
   }
@@ -183,11 +213,18 @@ class EstimateCard extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(l10n.estFineness,
-            style: TextStyle(color: c.textSecondary, fontSize: 12)),
-        Text(f.label,
-            style: TextStyle(
-                color: f.color, fontSize: 12, fontWeight: FontWeight.w700)),
+        Text(
+          l10n.estFineness,
+          style: TextStyle(color: c.textSecondary, fontSize: 12),
+        ),
+        Text(
+          f.label,
+          style: TextStyle(
+            color: f.color,
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
       ],
     );
   }
@@ -229,14 +266,27 @@ class EstimateCard extends StatelessWidget {
     final ratio = (est / src).clamp(0.0, 1.0);
     final level = (ratio * 10).round();
     if (ratio >= 0.66) {
-      return _Fineness(level, l10n.finenessFine, c.success, l10n.finenessHintFine);
+      return _Fineness(
+        level,
+        l10n.finenessFine,
+        c.success,
+        l10n.finenessHintFine,
+      );
     }
     if (ratio >= 0.33) {
       return _Fineness(
-          level, l10n.finenessBalanced, c.warn, l10n.finenessHintBalanced);
+        level,
+        l10n.finenessBalanced,
+        c.warn,
+        l10n.finenessHintBalanced,
+      );
     }
     return _Fineness(
-        level, l10n.finenessCoarse, c.danger, l10n.finenessHintCoarse);
+      level,
+      l10n.finenessCoarse,
+      c.danger,
+      l10n.finenessHintCoarse,
+    );
   }
 }
 
@@ -272,19 +322,23 @@ class _Stat extends StatelessWidget {
         Row(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            Text(value,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 26,
-                  fontWeight: FontWeight.w800,
-                  fontFamilyFallback: kMonoFallback,
-                  height: 1,
-                )),
+            Text(
+              value,
+              style: TextStyle(
+                color: color,
+                fontSize: 26,
+                fontWeight: FontWeight.w800,
+                fontFamilyFallback: kMonoFallback,
+                height: 1,
+              ),
+            ),
             const SizedBox(width: 3),
             Padding(
               padding: const EdgeInsets.only(bottom: 3),
-              child:
-                  Text(unit, style: TextStyle(color: c.textMuted, fontSize: 11)),
+              child: Text(
+                unit,
+                style: TextStyle(color: c.textMuted, fontSize: 11),
+              ),
             ),
           ],
         ),

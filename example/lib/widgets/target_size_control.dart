@@ -34,7 +34,10 @@ class TargetSizeControl extends StatelessWidget {
       child: Column(
         children: [
           ValueReadout(
-              label: l10n.modeTargetSize, value: '${value.round()}', unit: 'MB'),
+            label: l10n.modeTargetSize,
+            value: '${value.round()}',
+            unit: 'MB',
+          ),
           Slider(
             value: value,
             min: 1,
@@ -48,8 +51,10 @@ class TargetSizeControl extends StatelessWidget {
             children: [
               Text('1 MB', style: TextStyle(color: c.textMuted, fontSize: 11)),
               if (info != null)
-                Text('${l10n.sourceLabel} $maxMB MB',
-                    style: TextStyle(color: c.textMuted, fontSize: 11)),
+                Text(
+                  '${l10n.sourceLabel} $maxMB MB',
+                  style: TextStyle(color: c.textMuted, fontSize: 11),
+                ),
             ],
           ),
         ],

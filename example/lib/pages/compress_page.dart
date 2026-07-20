@@ -68,24 +68,28 @@ class _CompressPageState extends State<CompressPage> {
     }
     if (_qualityMode == QualityMode.percent) {
       return VideoCompressConfig(
-          codec: _codec,
-          qualityPercent: _qualityPercent,
-          maxWidth: qualityCap.w,
-          maxHeight: qualityCap.h);
+        codec: _codec,
+        qualityPercent: _qualityPercent,
+        maxWidth: qualityCap.w,
+        maxHeight: qualityCap.h,
+      );
     }
     return VideoCompressConfig(
-        codec: _codec,
-        quality: _quality,
-        maxWidth: qualityCap.w,
-        maxHeight: qualityCap.h);
+      codec: _codec,
+      quality: _quality,
+      maxWidth: qualityCap.w,
+      maxHeight: qualityCap.h,
+    );
   }
 
   // ---- data --------------------------------------------------------------
 
   Future<void> _pickVideo() async {
     final l10n = AppLocalizations.of(context);
-    final result =
-        await FilePicker.pickFiles(type: FileType.video, withData: kIsWeb);
+    final result = await FilePicker.pickFiles(
+      type: FileType.video,
+      withData: kIsWeb,
+    );
     // xFile.path is the real path on native and a blob: URL on web.
     final path = result?.files.single.xFile.path;
     if (path == null || path.isEmpty) return;
@@ -100,8 +104,11 @@ class _CompressPageState extends State<CompressPage> {
       final info = await _compressor.getVideoInfo(path);
       String? thumb;
       try {
-        thumb =
-            await _compressor.getThumbnail(path, positionMs: 0, maxWidth: 320);
+        thumb = await _compressor.getThumbnail(
+          path,
+          positionMs: 0,
+          maxWidth: 320,
+        );
       } catch (_) {}
       final srcMB = (info.sizeBytes / 1024 / 1024).ceil();
       setState(() {
@@ -149,13 +156,15 @@ class _CompressPageState extends State<CompressPage> {
     if (path == null) return _appendLog(l10n.logPickVideoFirst);
     try {
       final info = await _compressor.getVideoInfo(path);
-      _appendLog(l10n.logInfo(
-        '${info.width}',
-        '${info.height}',
-        (info.sizeBytes / 1024 / 1024).toStringAsFixed(1),
-        '${info.durationMs}',
-        '${info.bitrateKbps}',
-      ));
+      _appendLog(
+        l10n.logInfo(
+          '${info.width}',
+          '${info.height}',
+          (info.sizeBytes / 1024 / 1024).toStringAsFixed(1),
+          '${info.durationMs}',
+          '${info.bitrateKbps}',
+        ),
+      );
     } catch (e) {
       _appendLog(l10n.logInfoError('$e'));
     }
@@ -168,12 +177,14 @@ class _CompressPageState extends State<CompressPage> {
     await _refreshEstimate();
     final est = _est;
     if (est != null) {
-      _appendLog(l10n.logEstimate(
-        (est.estimatedSizeBytes / 1024 / 1024).toStringAsFixed(1),
-        '${est.estimatedBitrateKbps}',
-        '${est.targetWidth}',
-        '${est.targetHeight}',
-      ));
+      _appendLog(
+        l10n.logEstimate(
+          (est.estimatedSizeBytes / 1024 / 1024).toStringAsFixed(1),
+          '${est.estimatedBitrateKbps}',
+          '${est.targetWidth}',
+          '${est.targetHeight}',
+        ),
+      );
     }
   }
 
@@ -202,11 +213,13 @@ class _CompressPageState extends State<CompressPage> {
       if (result.skipped) {
         _appendLog(l10n.logSkipped);
       } else {
-        _appendLog(l10n.logDone(
-          (result.compressedSizeBytes / 1024 / 1024).toStringAsFixed(1),
-          result.savedPercent.toStringAsFixed(1),
-          result.codec,
-        ));
+        _appendLog(
+          l10n.logDone(
+            (result.compressedSizeBytes / 1024 / 1024).toStringAsFixed(1),
+            result.savedPercent.toStringAsFixed(1),
+            result.codec,
+          ),
+        );
         if (routeToDownloads) {
           final saved = await _compressor.saveToDownloads(
             result.outputPath,
@@ -306,7 +319,8 @@ class _CompressPageState extends State<CompressPage> {
                           ? EstimateCard(
                               estimate: _est!,
                               info: _videoInfo,
-                              expanded: true)
+                              expanded: true,
+                            )
                           : _sidebarPlaceholder(),
                     ),
                     const SizedBox(height: 16),
@@ -413,12 +427,18 @@ class _CompressPageState extends State<CompressPage> {
           children: [
             Icon(Icons.insights_outlined, color: c.textMuted, size: 34),
             const SizedBox(height: 12),
-            Text(l10n.estimateTitle,
-                style: TextStyle(
-                    color: c.textSecondary, fontWeight: FontWeight.w600)),
+            Text(
+              l10n.estimateTitle,
+              style: TextStyle(
+                color: c.textSecondary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
             const SizedBox(height: 4),
-            Text(l10n.pickVideo,
-                style: TextStyle(color: c.textMuted, fontSize: 12)),
+            Text(
+              l10n.pickVideo,
+              style: TextStyle(color: c.textMuted, fontSize: 12),
+            ),
           ],
         ),
       ),

@@ -47,22 +47,22 @@ class AppColors {
   final Color thumbBottom;
 
   LinearGradient get accentGradient => LinearGradient(
-        colors: [accent, accent2],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      );
+    colors: [accent, accent2],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
 
   LinearGradient get cardGradient => LinearGradient(
-        colors: [cardTop, cardBottom],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      );
+    colors: [cardTop, cardBottom],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
 
   LinearGradient get thumbGradient => LinearGradient(
-        colors: [thumbTop, thumbBottom],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      );
+    colors: [thumbTop, thumbBottom],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
 
   static const dark = AppColors(
     bg: Color(0xFF0A0912),
@@ -156,16 +156,8 @@ class AppBackground extends StatelessWidget {
       color: c.bg,
       child: Stack(
         children: [
-          Positioned(
-            top: -180,
-            left: -120,
-            child: _glow(c.glow1, 460),
-          ),
-          Positioned(
-            top: 40,
-            right: -160,
-            child: _glow(c.glow2, 480),
-          ),
+          Positioned(top: -180, left: -120, child: _glow(c.glow1, 460)),
+          Positioned(top: 40, right: -160, child: _glow(c.glow2, 480)),
           Positioned.fill(child: child),
         ],
       ),
@@ -173,17 +165,15 @@ class AppBackground extends StatelessWidget {
   }
 
   Widget _glow(Color color, double size) => IgnorePointer(
-        child: Container(
-          width: size,
-          height: size,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: RadialGradient(
-              colors: [color, color.withValues(alpha: 0)],
-            ),
-          ),
-        ),
-      );
+    child: Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: RadialGradient(colors: [color, color.withValues(alpha: 0)]),
+      ),
+    ),
+  );
 }
 
 /// Rounded glassy card used throughout the layout.

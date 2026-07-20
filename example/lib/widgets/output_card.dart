@@ -33,8 +33,10 @@ class OutputCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(l10n.outputFolder,
-                    style: TextStyle(color: c.textMuted, fontSize: 11)),
+                Text(
+                  l10n.outputFolder,
+                  style: TextStyle(color: c.textMuted, fontSize: 11),
+                ),
                 const SizedBox(height: 2),
                 Text(
                   isAndroid
@@ -50,9 +52,10 @@ class OutputCard extends StatelessWidget {
           if (!isAndroid)
             TextButton(
               onPressed: busy ? null : onPick,
-              child: Text(l10n.pickFolder,
-                  style:
-                      TextStyle(color: c.accent, fontWeight: FontWeight.w600)),
+              child: Text(
+                l10n.pickFolder,
+                style: TextStyle(color: c.accent, fontWeight: FontWeight.w600),
+              ),
             ),
         ],
       ),

@@ -9,14 +9,14 @@ class SectionLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Text(
-        text,
-        style: TextStyle(
-          color: context.c.textMuted,
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-          letterSpacing: 1,
-        ),
-      );
+    text,
+    style: TextStyle(
+      color: context.c.textMuted,
+      fontSize: 12,
+      fontWeight: FontWeight.w600,
+      letterSpacing: 1,
+    ),
+  );
 }
 
 /// Small metadata chip (e.g. "1080p", "248 MB").
@@ -34,11 +34,14 @@ class LabelChip extends StatelessWidget {
         borderRadius: BorderRadius.circular(7),
         border: Border.all(color: c.pillBorder),
       ),
-      child: Text(text,
-          style: TextStyle(
-              color: c.textSecondary,
-              fontSize: 11,
-              fontWeight: FontWeight.w600)),
+      child: Text(
+        text,
+        style: TextStyle(
+          color: c.textSecondary,
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
     );
   }
 }
@@ -74,14 +77,18 @@ class Pill extends StatelessWidget {
           gradient: selected ? c.accentGradient : null,
           color: selected ? null : c.pill,
           borderRadius: BorderRadius.circular(dense ? 11 : 13),
-          border:
-              Border.all(color: selected ? Colors.transparent : c.pillBorder),
+          border: Border.all(
+            color: selected ? Colors.transparent : c.pillBorder,
+          ),
         ),
-        child: Text(label,
-            style: TextStyle(
-                color: selected ? c.onAccent : c.textSecondary,
-                fontWeight: dense ? FontWeight.w600 : FontWeight.w700,
-                fontSize: dense ? 13 : 14)),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: selected ? c.onAccent : c.textSecondary,
+            fontWeight: dense ? FontWeight.w600 : FontWeight.w700,
+            fontSize: dense ? 13 : 14,
+          ),
+        ),
       ),
     );
   }
@@ -114,19 +121,27 @@ class ModeToggle extends StatelessWidget {
           gradient: selected ? c.accentGradient : null,
           color: selected ? null : c.pill,
           borderRadius: BorderRadius.circular(16),
-          border:
-              Border.all(color: selected ? Colors.transparent : c.pillBorder),
+          border: Border.all(
+            color: selected ? Colors.transparent : c.pillBorder,
+          ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 18, color: selected ? c.onAccent : c.textSecondary),
+            Icon(
+              icon,
+              size: 18,
+              color: selected ? c.onAccent : c.textSecondary,
+            ),
             const SizedBox(width: 8),
-            Text(label,
-                style: TextStyle(
-                    color: selected ? c.onAccent : c.textSecondary,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 15)),
+            Text(
+              label,
+              style: TextStyle(
+                color: selected ? c.onAccent : c.textSecondary,
+                fontWeight: FontWeight.w700,
+                fontSize: 15,
+              ),
+            ),
           ],
         ),
       ),
@@ -166,11 +181,14 @@ class GhostButton extends StatelessWidget {
           children: [
             Icon(icon, size: 18, color: disabled ? c.textMuted : c.textPrimary),
             const SizedBox(width: 8),
-            Text(label,
-                style: TextStyle(
-                    color: disabled ? c.textMuted : c.textPrimary,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14)),
+            Text(
+              label,
+              style: TextStyle(
+                color: disabled ? c.textMuted : c.textPrimary,
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+              ),
+            ),
           ],
         ),
       ),
@@ -218,11 +236,14 @@ class PrimaryButton extends StatelessWidget {
           children: [
             Icon(icon, color: Colors.white, size: 20),
             const SizedBox(width: 8),
-            Text(label,
-                style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 16)),
+            Text(
+              label,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
+                fontSize: 16,
+              ),
+            ),
           ],
         ),
       ),
@@ -250,27 +271,34 @@ class ValueReadout extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.end,
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label,
-            style: TextStyle(
-                color: c.textSecondary,
-                fontSize: 13,
-                fontWeight: FontWeight.w600)),
+        Text(
+          label,
+          style: TextStyle(
+            color: c.textSecondary,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
         Row(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            Text(value,
-                style: TextStyle(
-                  color: c.textPrimary,
-                  fontSize: 30,
-                  fontWeight: FontWeight.w800,
-                  fontFamilyFallback: kMonoFallback,
-                  height: 1,
-                )),
+            Text(
+              value,
+              style: TextStyle(
+                color: c.textPrimary,
+                fontSize: 30,
+                fontWeight: FontWeight.w800,
+                fontFamilyFallback: kMonoFallback,
+                height: 1,
+              ),
+            ),
             const SizedBox(width: 3),
             Padding(
               padding: const EdgeInsets.only(bottom: 3),
-              child:
-                  Text(unit, style: TextStyle(color: c.textMuted, fontSize: 12)),
+              child: Text(
+                unit,
+                style: TextStyle(color: c.textMuted, fontSize: 12),
+              ),
             ),
           ],
         ),
