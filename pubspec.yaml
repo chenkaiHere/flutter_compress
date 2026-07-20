@@ -1,0 +1,49 @@
+name: flutter_compress
+description: "High-quality Flutter video compression with precise target-size / bitrate control, HEVC with automatic H.264 fallback, background compression, live progress and cancellation. No FFmpeg — Media3 Transformer on Android, AVAssetReader/Writer on iOS, WebCodecs on Web."
+version: 1.0.0
+homepage: https://github.com/chenkaiHere/flutter_compress
+repository: https://github.com/chenkaiHere/flutter_compress
+
+environment:
+  sdk: ^3.5.0
+  flutter: '>=3.24.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  plugin_platform_interface: ^2.1.8
+  # Web backend (WebCodecs + mp4box/mp4-muxer via JS interop).
+  flutter_web_plugins:
+    sdk: flutter
+  web: ^1.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  plugin:
+    platforms:
+      android:
+        package: com.compress.all.flutter_compress
+        pluginClass: FlutterCompressPlugin
+      ios:
+        pluginClass: FlutterCompressPlugin
+      web:
+        pluginClass: FlutterCompressWeb
+        fileName: flutter_compress_web.dart
+
+  # Vendored web engine + demux/mux libraries (served at
+  # assets/packages/flutter_compress/assets/…), loaded lazily on web.
+  assets:
+    - assets/mp4box.all.min.js
+    - assets/mp4-muxer.js
+    - assets/flutter_compress_web.js
+
+topics:
+  - video
+  - compression
+  - video-compression
+  - media
+  - transcoder

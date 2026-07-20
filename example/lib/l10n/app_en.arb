@@ -1,0 +1,106 @@
+{
+  "@@locale": "en",
+  "appTitle": "Video Compressor",
+  "language": "Language",
+  "systemDefault": "System default",
+  "inputVideo": "Input video",
+  "noFileSelected": "No file selected",
+  "pickVideo": "Pick video",
+  "outputFolder": "Output folder (optional)",
+  "outputHintAndroid": "Android: always saved to public Downloads",
+  "outputHintOther": "App documents / Downloads",
+  "pickFolder": "Pick folder",
+  "clear": "Clear",
+  "codec": "Codec",
+  "quality": "Quality",
+  "targetSizeMb": "Target size (MB)",
+  "qualityPercent": "Quality %",
+  "compressionMode": "Compression mode",
+  "modeTargetSize": "Target size",
+  "modeQuality": "Quality",
+  "qualityMode": "Quality mode",
+  "modePreset": "Preset",
+  "modeCustom": "Custom %",
+  "tagline": "Local · No upload · No watermark",
+  "reselectVideo": "Reselect video",
+  "estimateTitle": "Estimate",
+  "estimateBasedOn": "Based on current settings",
+  "estOutput": "Est. output",
+  "estSaved": "Saved",
+  "estFineness": "Est. detail",
+  "finenessFine": "Fine",
+  "finenessBalanced": "Balanced",
+  "finenessCoarse": "Coarse",
+  "sourceLabel": "Source",
+  "finenessHintFine": "Near-lossless — great for archiving and re-editing.",
+  "finenessHintBalanced": "Balanced quality and size — ideal for sharing.",
+  "finenessHintCoarse": "Heavier compression — best for very small files.",
+  "off": "off",
+  "actionInfo": "Info",
+  "actionEstimate": "Estimate",
+  "actionCompress": "Compress",
+  "actionCancel": "Cancel",
+  "logPickedInput": "picked input: {path}",
+  "@logPickedInput": {
+    "placeholders": { "path": { "type": "String" } }
+  },
+  "logOutputDir": "output dir: {dir}",
+  "@logOutputDir": {
+    "placeholders": { "dir": { "type": "String" } }
+  },
+  "logPickVideoFirst": "pick a video first",
+  "logInfo": "info: {width}x{height}, {size} MB, {duration} ms, {bitrate} kbps",
+  "@logInfo": {
+    "placeholders": {
+      "width": { "type": "String" },
+      "height": { "type": "String" },
+      "size": { "type": "String" },
+      "duration": { "type": "String" },
+      "bitrate": { "type": "String" }
+    }
+  },
+  "logInfoError": "info error: {error}",
+  "@logInfoError": {
+    "placeholders": { "error": { "type": "String" } }
+  },
+  "logEstimate": "estimate: ~{size} MB at {bitrate} kbps -> {width}x{height}",
+  "@logEstimate": {
+    "placeholders": {
+      "size": { "type": "String" },
+      "bitrate": { "type": "String" },
+      "width": { "type": "String" },
+      "height": { "type": "String" }
+    }
+  },
+  "logEstimateError": "estimate error: {error}",
+  "@logEstimateError": {
+    "placeholders": { "error": { "type": "String" } }
+  },
+  "logPickValidVideoFirst": "pick a valid video first",
+  "logStoragePermission": "storage permission: {status}",
+  "@logStoragePermission": {
+    "placeholders": { "status": { "type": "String" } }
+  },
+  "logSkipped": "skipped (compression would not reduce size)",
+  "logDone": "done: {size} MB (saved {saved}%, {codec})",
+  "@logDone": {
+    "placeholders": {
+      "size": { "type": "String" },
+      "saved": { "type": "String" },
+      "codec": { "type": "String" }
+    }
+  },
+  "logSavedToDownloads": "saved to Downloads: {path}",
+  "@logSavedToDownloads": {
+    "placeholders": { "path": { "type": "String" } }
+  },
+  "logOutput": "output: {path}",
+  "@logOutput": {
+    "placeholders": { "path": { "type": "String" } }
+  },
+  "logCancelled": "cancelled",
+  "logError": "error: {error}",
+  "@logError": {
+    "placeholders": { "error": { "type": "String" } }
+  }
+}
