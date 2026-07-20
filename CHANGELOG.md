@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.1
+
+- Docs and pub.dev metadata polish (`dart format`, shorter description). No API or behavior changes.
+
 ## 1.0.0
 
 Initial release — native, FFmpeg-free video compression for Android, iOS & Web.
