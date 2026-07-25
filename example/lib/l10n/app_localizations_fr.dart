@@ -118,6 +118,30 @@ class AppLocalizationsFr extends AppLocalizations {
       'Compression forte — pour des fichiers très légers.';
 
   @override
+  String get navVideo => 'Vidéo';
+
+  @override
+  String get navImage => 'Image';
+
+  @override
+  String get imageTitle => 'Compresseur d\'images';
+
+  @override
+  String get inputImage => 'Image d\'entrée';
+
+  @override
+  String get pickImage => 'Choisir une image';
+
+  @override
+  String get reselectImage => 'Choisir une autre image';
+
+  @override
+  String get format => 'Format';
+
+  @override
+  String get targetSizeKb => 'Taille cible (Ko)';
+
+  @override
   String get off => 'désactivé';
 
   @override

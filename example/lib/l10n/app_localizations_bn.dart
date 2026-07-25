@@ -117,6 +117,30 @@ class AppLocalizationsBn extends AppLocalizations {
   String get finenessHintCoarse => 'বেশি কম্প্রেশন — খুব ছোট ফাইলের জন্য সেরা।';
 
   @override
+  String get navVideo => 'ভিডিও';
+
+  @override
+  String get navImage => 'ছবি';
+
+  @override
+  String get imageTitle => 'ছবি কম্প্রেসর';
+
+  @override
+  String get inputImage => 'ইনপুট ছবি';
+
+  @override
+  String get pickImage => 'ছবি নির্বাচন করুন';
+
+  @override
+  String get reselectImage => 'আবার ছবি নির্বাচন করুন';
+
+  @override
+  String get format => 'ফরম্যাট';
+
+  @override
+  String get targetSizeKb => 'লক্ষ্য আকার (KB)';
+
+  @override
   String get off => 'বন্ধ';
 
   @override

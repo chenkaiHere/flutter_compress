@@ -116,6 +116,30 @@ class AppLocalizationsAr extends AppLocalizations {
   String get finenessHintCoarse => 'ضغط أقوى — الأفضل للملفات الصغيرة جدًا.';
 
   @override
+  String get navVideo => 'فيديو';
+
+  @override
+  String get navImage => 'صورة';
+
+  @override
+  String get imageTitle => 'ضاغط الصور';
+
+  @override
+  String get inputImage => 'صورة الإدخال';
+
+  @override
+  String get pickImage => 'اختر صورة';
+
+  @override
+  String get reselectImage => 'إعادة اختيار الصورة';
+
+  @override
+  String get format => 'الصيغة';
+
+  @override
+  String get targetSizeKb => 'الحجم المستهدف (كيلوبايت)';
+
+  @override
   String get off => 'إيقاف';
 
   @override

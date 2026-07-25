@@ -23,7 +23,11 @@ const Map<String, String> kLanguageNames = {
 
 /// Brand + title + tagline on the left; theme toggle + language menu on right.
 class AppHeader extends StatelessWidget {
-  const AppHeader({super.key});
+  const AppHeader({super.key, this.title});
+
+  /// Big title; defaults to the app title (video). Pass e.g. the image title
+  /// so the header reflects the active tab.
+  final String? title;
 
   @override
   Widget build(BuildContext context) {
@@ -50,7 +54,7 @@ class AppHeader extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  l10n.appTitle,
+                  title ?? l10n.appTitle,
                   style: TextStyle(
                     color: c.textPrimary,
                     fontSize: 26,

@@ -114,6 +114,30 @@ class AppLocalizationsZh extends AppLocalizations {
   String get finenessHintCoarse => '压缩较重,适合极小体积场景。';
 
   @override
+  String get navVideo => '视频';
+
+  @override
+  String get navImage => '图片';
+
+  @override
+  String get imageTitle => '图片压缩';
+
+  @override
+  String get inputImage => '输入图片';
+
+  @override
+  String get pickImage => '选择图片';
+
+  @override
+  String get reselectImage => '重新选择图片';
+
+  @override
+  String get format => '格式';
+
+  @override
+  String get targetSizeKb => '目标大小 (KB)';
+
+  @override
   String get off => '关闭';
 
   @override

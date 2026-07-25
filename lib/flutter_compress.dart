@@ -1,8 +1,10 @@
 import 'dart:async';
 
 import 'flutter_compress_platform_interface.dart';
+import 'src/image_models.dart';
 import 'src/models.dart';
 
+export 'src/image_models.dart';
 export 'src/models.dart';
 
 /// A cancellation handle for a single compression job.
@@ -145,6 +147,50 @@ class FlutterCompress {
 
   /// Delete temporary files this plugin produced.
   Future<void> clearCache() => _platform.clearCache();
+
+  // ==== Images ============================================================
+  // A separate API surface from the video methods above; they never mix.
+
+  /// Probe a source image's dimensions/size/format.
+  Future<ImageMeta> getImageInfo(String path) => _platform.getImageInfo(path);
+
+  /// Compress a single image.
+  ///
+  /// With [ImageCompressConfig.targetSizeKB] the native engine iterates to land
+  /// at or just under the target (accurate, since images encode fast).
+  /// [outputDirectory] chooses where to write; null uses the plugin cache.
+  Future<ImageCompressResult> compressImage(
+    String path,
+    ImageCompressConfig config, {
+    String? outputDirectory,
+  }) {
+    final outputPath = outputDirectory == null
+        ? null
+        : '${_stripTrailingSlash(outputDirectory)}/${_newId()}.${_ext(config.format)}';
+    return _platform.compressImage(path, config, outputPath);
+  }
+
+  /// Compress a list of images sequentially.
+  Future<List<ImageCompressResult>> compressImages(
+    List<String> paths,
+    ImageCompressConfig config, {
+    String? outputDirectory,
+  }) async {
+    final out = <ImageCompressResult>[];
+    for (final p in paths) {
+      out.add(await compressImage(p, config, outputDirectory: outputDirectory));
+    }
+    return out;
+  }
+
+  String _ext(ImageFormat f) => switch (f) {
+        ImageFormat.jpeg => 'jpg',
+        ImageFormat.png => 'png',
+        ImageFormat.webp => 'webp',
+        ImageFormat.heic => 'heic',
+      };
+
+  // ========================================================================
 
   /// Persist [path] to a user-accessible location and return where it landed.
   ///

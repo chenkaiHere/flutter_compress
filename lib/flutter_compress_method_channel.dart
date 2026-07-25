@@ -1,6 +1,7 @@
 import 'package:flutter/services.dart';
 
 import 'flutter_compress_platform_interface.dart';
+import 'src/image_models.dart';
 import 'src/models.dart';
 
 /// MethodChannel + EventChannel implementation of [FlutterCompressPlatform].
@@ -106,5 +107,29 @@ class MethodChannelFlutterCompress extends FlutterCompressPlatform {
       'fileName': fileName,
     });
     return res!;
+  }
+
+  // ---- images ------------------------------------------------------------
+
+  @override
+  Future<ImageMeta> getImageInfo(String path) async {
+    final res = await _method
+        .invokeMethod<Map<dynamic, dynamic>>('getImageInfo', {'path': path});
+    return ImageMeta.fromMap(res!);
+  }
+
+  @override
+  Future<ImageCompressResult> compressImage(
+    String path,
+    ImageCompressConfig config,
+    String? outputPath,
+  ) async {
+    final res =
+        await _method.invokeMethod<Map<dynamic, dynamic>>('compressImage', {
+      'path': path,
+      'config': config.toMap(),
+      'outputPath': outputPath,
+    });
+    return ImageCompressResult.fromMap(res!);
   }
 }

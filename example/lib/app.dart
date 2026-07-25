@@ -3,7 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app_theme.dart';
 import 'l10n/app_localizations.dart';
-import 'pages/compress_page.dart';
+import 'pages/home_page.dart';
 
 /// Root widget: owns the app-wide locale and theme mode (both persisted), and
 /// exposes static helpers so any descendant can change them.
@@ -86,7 +86,7 @@ class _DemoAppState extends State<DemoApp> {
         }
         return const Locale('en');
       },
-      home: const CompressPage(),
+      home: const HomePage(),
     );
   }
 }

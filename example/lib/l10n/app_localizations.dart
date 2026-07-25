@@ -328,6 +328,54 @@ abstract class AppLocalizations {
   /// **'Heavier compression — best for very small files.'**
   String get finenessHintCoarse;
 
+  /// No description provided for @navVideo.
+  ///
+  /// In en, this message translates to:
+  /// **'Video'**
+  String get navVideo;
+
+  /// No description provided for @navImage.
+  ///
+  /// In en, this message translates to:
+  /// **'Image'**
+  String get navImage;
+
+  /// No description provided for @imageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Image Compressor'**
+  String get imageTitle;
+
+  /// No description provided for @inputImage.
+  ///
+  /// In en, this message translates to:
+  /// **'Input image'**
+  String get inputImage;
+
+  /// No description provided for @pickImage.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick image'**
+  String get pickImage;
+
+  /// No description provided for @reselectImage.
+  ///
+  /// In en, this message translates to:
+  /// **'Reselect image'**
+  String get reselectImage;
+
+  /// No description provided for @format.
+  ///
+  /// In en, this message translates to:
+  /// **'Format'**
+  String get format;
+
+  /// No description provided for @targetSizeKb.
+  ///
+  /// In en, this message translates to:
+  /// **'Target size (KB)'**
+  String get targetSizeKb;
+
   /// No description provided for @off.
   ///
   /// In en, this message translates to:

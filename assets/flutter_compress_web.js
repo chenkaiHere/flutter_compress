@@ -283,6 +283,77 @@
     };
   };
 
+  // ---- images (canvas + toBlob; no WebCodecs/MP4 needed) -----------------
+
+  NS.getImageInfo = async function (url) {
+    const blob = await (await fetch(url)).blob();
+    const bmp = await createImageBitmap(blob);
+    const info = {
+      path: url, width: bmp.width, height: bmp.height,
+      sizeBytes: blob.size,
+      format: blob.type ? blob.type.replace('image/', '') : null,
+    };
+    bmp.close();
+    return info;
+  };
+
+  // cfg: { format, quality, targetSizeKB, maxWidth, maxHeight }
+  NS.compressImage = async function (url, cfg) {
+    const blob = await (await fetch(url)).blob();
+    const bmp = await createImageBitmap(blob);
+
+    // Canvas can't encode HEIC; WebP only where the browser supports it.
+    let fmt = cfg.format === 'heic' ? 'jpeg' : cfg.format;
+    const mime = fmt === 'png' ? 'image/png' : fmt === 'webp' ? 'image/webp' : 'image/jpeg';
+    const lossy = fmt !== 'png';
+
+    function fitDims(w, h) {
+      let fw = w, fh = h;
+      if (cfg.maxWidth && fw > cfg.maxWidth) { const s = cfg.maxWidth / fw; fw *= s; fh *= s; }
+      if (cfg.maxHeight && fh > cfg.maxHeight) { const s = cfg.maxHeight / fh; fw *= s; fh *= s; }
+      return [Math.max(1, Math.round(fw)), Math.max(1, Math.round(fh))];
+    }
+    function draw(w, h) {
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      c.getContext('2d').drawImage(bmp, 0, 0, w, h);
+      return c;
+    }
+    function toBlob(canvas, q) {
+      return new Promise((res) => canvas.toBlob((b) => res(b), mime, lossy ? q : undefined));
+    }
+    async function fit(canvas, target) {
+      if (!lossy || !target) return await toBlob(canvas, (cfg.quality || 85) / 100);
+      let lo = 1, hi = 100, best = null;
+      while (lo <= hi) {
+        const q = Math.floor((lo + hi) / 2);
+        const b = await toBlob(canvas, q / 100);
+        if (b && b.size <= target) { best = b; lo = q + 1; } else { hi = q - 1; }
+      }
+      return best || await toBlob(canvas, 0.01);
+    }
+
+    const target = cfg.targetSizeKB ? cfg.targetSizeKB * 1024 : null;
+    let [w, h] = fitDims(bmp.width, bmp.height);
+    let canvas = draw(w, h);
+    let out = await fit(canvas, target);
+    let tries = 0;
+    while (target && out && out.size > target && tries < 5 && canvas.width > 32) {
+      w = Math.round(canvas.width * 0.75); h = Math.round(canvas.height * 0.75);
+      canvas = draw(w, h);
+      out = await fit(canvas, target);
+      tries++;
+    }
+    bmp.close();
+    if (!out) throw new Error('image encode failed');
+    return {
+      outputPath: URL.createObjectURL(out),
+      originalSizeBytes: blob.size,
+      compressedSizeBytes: out.size,
+      width: canvas.width, height: canvas.height, format: fmt,
+    };
+  };
+
   // ---- download / cleanup ------------------------------------------------
 
   NS.download = function (url, fileName) {

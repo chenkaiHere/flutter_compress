@@ -54,4 +54,66 @@ void main() {
     expect(p.progress, 0.5);
     expect(p.estimatedRemainingMs, isNull);
   });
+
+  // ---- images (separate API) --------------------------------------------
+
+  group('ImageCompressConfig', () {
+    test('serializes intent to a channel map', () {
+      const config = ImageCompressConfig(
+        format: ImageFormat.webp,
+        targetSizeKB: 200,
+        maxWidth: 1920,
+        keepExif: true,
+      );
+      final map = config.toMap();
+      expect(map['format'], 'webp');
+      expect(map['targetSizeKB'], 200);
+      expect(map['maxWidth'], 1920);
+      expect(map['keepExif'], true);
+    });
+
+    test('defaults are sensible', () {
+      const config = ImageCompressConfig();
+      final map = config.toMap();
+      expect(map['format'], 'jpeg');
+      expect(map['quality'], 85);
+      expect(map['targetSizeKB'], isNull);
+      expect(map['keepExif'], false);
+    });
+
+    test('rejects out-of-range quality', () {
+      expect(() => ImageCompressConfig(quality: 0), throwsA(isA<AssertionError>()));
+      expect(
+          () => ImageCompressConfig(quality: 101), throwsA(isA<AssertionError>()));
+    });
+  });
+
+  group('ImageCompressResult', () {
+    test('computes savings from sizes', () {
+      final r = ImageCompressResult.fromMap({
+        'outputPath': '/tmp/out.jpg',
+        'originalSizeBytes': 1000,
+        'compressedSizeBytes': 200,
+        'width': 800,
+        'height': 600,
+        'format': 'jpeg',
+      });
+      expect(r.compressionRatio, 0.2);
+      expect(r.savedPercent, 80);
+      expect(r.format, 'jpeg');
+    });
+  });
+
+  test('ImageMeta parses a channel map', () {
+    final m = ImageMeta.fromMap({
+      'path': '/tmp/a.png',
+      'width': 1200,
+      'height': 800,
+      'sizeBytes': 345678,
+      'format': 'png',
+    });
+    expect(m.width, 1200);
+    expect(m.height, 800);
+    expect(m.format, 'png');
+  });
 }

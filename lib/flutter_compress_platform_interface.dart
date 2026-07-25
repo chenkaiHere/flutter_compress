@@ -1,6 +1,7 @@
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
 import 'flutter_compress_method_channel.dart';
+import 'src/image_models.dart';
 import 'src/models.dart';
 
 /// The interface that platform implementations of flutter_compress implement.
@@ -64,4 +65,16 @@ abstract class FlutterCompressPlatform extends PlatformInterface {
 
   Future<String> saveToDownloads(String path, String? fileName) =>
       throw UnimplementedError('saveToDownloads() has not been implemented.');
+
+  // ---- images (separate from the video API above) -----------------------
+
+  Future<ImageMeta> getImageInfo(String path) =>
+      throw UnimplementedError('getImageInfo() has not been implemented.');
+
+  Future<ImageCompressResult> compressImage(
+    String path,
+    ImageCompressConfig config,
+    String? outputPath,
+  ) =>
+      throw UnimplementedError('compressImage() has not been implemented.');
 }

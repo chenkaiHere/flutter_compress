@@ -5,6 +5,7 @@ import 'package:flutter_web_plugins/flutter_web_plugins.dart';
 import 'package:web/web.dart' as web;
 
 import 'flutter_compress_platform_interface.dart';
+import 'src/image_models.dart';
 import 'src/models.dart';
 
 // ---- JS bindings to assets/flutter_compress_web.js -----------------------
@@ -29,6 +30,12 @@ external void _jsCancel(String id);
 @JS('flutterCompressWeb.download')
 external String _jsDownload(String url, String fileName);
 
+@JS('flutterCompressWeb.getImageInfo')
+external JSPromise<JSObject> _jsGetImageInfo(String url);
+
+@JS('flutterCompressWeb.compressImage')
+external JSPromise<JSObject> _jsCompressImage(String url, JSObject cfg);
+
 /// Web implementation backed by WebCodecs (VideoDecoder/VideoEncoder) with
 /// mp4box.js demuxing and mp4-muxer muxing — the browser-native parallel to
 /// Media3 (Android) and AVFoundation (iOS). No FFmpeg.
@@ -48,18 +55,25 @@ class FlutterCompressWeb extends FlutterCompressPlatform {
 
   // ---- script loading ----------------------------------------------------
 
+  static const _base = 'assets/packages/flutter_compress/assets/';
+  Future<void>? _imgLoaded;
+
   Future<void> _ensureLoaded() => _loaded ??= _load();
 
   Future<void> _load() async {
-    const base = 'assets/packages/flutter_compress/assets/';
-    await _loadScript('${base}mp4box.all.min.js');
-    await _loadScript('${base}mp4-muxer.js');
-    await _loadScript('${base}flutter_compress_web.js');
+    await _loadScript('${_base}mp4box.all.min.js');
+    await _loadScript('${_base}mp4-muxer.js');
+    await _loadScript('${_base}flutter_compress_web.js');
     if (!_jsIsSupported()) {
       throw VideoCompressException('unsupported',
           'WebCodecs / MP4 tooling not available in this browser');
     }
   }
+
+  /// Images only need the engine file (canvas-based) — skip the heavier
+  /// demux/mux libs and the WebCodecs support gate.
+  Future<void> _ensureImageLoaded() =>
+      _imgLoaded ??= _loadScript('${_base}flutter_compress_web.js');
 
   Future<void> _loadScript(String src) {
     final completer = Completer<void>();
@@ -207,8 +221,29 @@ class FlutterCompressWeb extends FlutterCompressPlatform {
 
   @override
   Future<String> saveToDownloads(String path, String? fileName) async {
-    await _ensureLoaded();
+    await _ensureImageLoaded(); // only needs the engine's download() helper
     return _jsDownload(path, fileName ?? 'compressed.mp4');
+  }
+
+  // ---- images ------------------------------------------------------------
+
+  @override
+  Future<ImageMeta> getImageInfo(String path) async {
+    await _ensureImageLoaded();
+    final m = (await _jsGetImageInfo(path).toDart).dartify() as Map;
+    return ImageMeta.fromMap(m.cast<dynamic, dynamic>());
+  }
+
+  @override
+  Future<ImageCompressResult> compressImage(
+    String path,
+    ImageCompressConfig config,
+    String? outputPath,
+  ) async {
+    await _ensureImageLoaded();
+    final cfg = config.toMap().jsify()! as JSObject;
+    final res = (await _jsCompressImage(path, cfg).toDart).dartify() as Map;
+    return ImageCompressResult.fromMap(res.cast<dynamic, dynamic>());
   }
 
   int _clampDuration(int full, VideoCompressConfig c) {

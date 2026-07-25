@@ -117,6 +117,30 @@ class AppLocalizationsUr extends AppLocalizations {
       'زیادہ کمپریشن — بہت چھوٹی فائلوں کے لیے بہترین۔';
 
   @override
+  String get navVideo => 'ویڈیو';
+
+  @override
+  String get navImage => 'تصویر';
+
+  @override
+  String get imageTitle => 'تصویر کمپریسر';
+
+  @override
+  String get inputImage => 'ان پٹ تصویر';
+
+  @override
+  String get pickImage => 'تصویر منتخب کریں';
+
+  @override
+  String get reselectImage => 'تصویر دوبارہ منتخب کریں';
+
+  @override
+  String get format => 'فارمیٹ';
+
+  @override
+  String get targetSizeKb => 'ہدف سائز (KB)';
+
+  @override
   String get off => 'بند';
 
   @override

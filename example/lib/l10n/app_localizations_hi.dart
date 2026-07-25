@@ -118,6 +118,30 @@ class AppLocalizationsHi extends AppLocalizations {
       'अधिक कंप्रेशन — बहुत छोटी फ़ाइलों के लिए सर्वोत्तम।';
 
   @override
+  String get navVideo => 'वीडियो';
+
+  @override
+  String get navImage => 'छवि';
+
+  @override
+  String get imageTitle => 'छवि कंप्रेसर';
+
+  @override
+  String get inputImage => 'इनपुट छवि';
+
+  @override
+  String get pickImage => 'छवि चुनें';
+
+  @override
+  String get reselectImage => 'छवि दोबारा चुनें';
+
+  @override
+  String get format => 'फ़ॉर्मेट';
+
+  @override
+  String get targetSizeKb => 'लक्ष्य आकार (KB)';
+
+  @override
   String get off => 'बंद';
 
   @override

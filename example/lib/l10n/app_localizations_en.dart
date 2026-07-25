@@ -117,6 +117,30 @@ class AppLocalizationsEn extends AppLocalizations {
       'Heavier compression — best for very small files.';
 
   @override
+  String get navVideo => 'Video';
+
+  @override
+  String get navImage => 'Image';
+
+  @override
+  String get imageTitle => 'Image Compressor';
+
+  @override
+  String get inputImage => 'Input image';
+
+  @override
+  String get pickImage => 'Pick image';
+
+  @override
+  String get reselectImage => 'Reselect image';
+
+  @override
+  String get format => 'Format';
+
+  @override
+  String get targetSizeKb => 'Target size (KB)';
+
+  @override
   String get off => 'off';
 
   @override

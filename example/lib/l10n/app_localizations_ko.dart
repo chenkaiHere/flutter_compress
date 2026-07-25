@@ -114,6 +114,30 @@ class AppLocalizationsKo extends AppLocalizations {
   String get finenessHintCoarse => '강한 압축 — 아주 작은 파일에 적합.';
 
   @override
+  String get navVideo => '동영상';
+
+  @override
+  String get navImage => '이미지';
+
+  @override
+  String get imageTitle => '이미지 압축';
+
+  @override
+  String get inputImage => '입력 이미지';
+
+  @override
+  String get pickImage => '이미지 선택';
+
+  @override
+  String get reselectImage => '이미지 다시 선택';
+
+  @override
+  String get format => '형식';
+
+  @override
+  String get targetSizeKb => '목표 크기 (KB)';
+
+  @override
   String get off => '끄기';
 
   @override

@@ -31,6 +31,7 @@ class FlutterCompressPlugin :
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var engine: CompressionEngine? = null
+    private var imageEngine: ImageEngine? = null
     private var eventSink: EventChannel.EventSink? = null
 
     override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
@@ -40,6 +41,7 @@ class FlutterCompressPlugin :
         eventChannel = EventChannel(binding.binaryMessenger, "flutter_compress/progress")
         eventChannel.setStreamHandler(this)
         engine = CompressionEngine(context) { eventSink?.success(it) }
+        imageEngine = ImageEngine(context)
     }
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
@@ -95,6 +97,19 @@ class FlutterCompressPlugin :
 
             "saveToDownloads" -> dispatch(result, "save_failed") {
                 DownloadSaver.save(context, call.str("path"), call.argument<String>("fileName"))
+            }
+
+            // ---- images ----
+            "getImageInfo" -> dispatch(result, "image_info_failed") {
+                imageEngine!!.info(call.str("path"))
+            }
+
+            "compressImage" -> dispatch(result, "image_compress_failed") {
+                imageEngine!!.compress(
+                    call.str("path"),
+                    ImageConfig.fromMap(call.argument<Map<String, Any?>>("config")!!),
+                    call.argument<String>("outputPath"),
+                )
             }
 
             else -> result.notImplemented()

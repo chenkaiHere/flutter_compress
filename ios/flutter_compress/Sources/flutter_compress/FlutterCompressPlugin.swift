@@ -88,6 +88,18 @@ public class FlutterCompressPlugin: NSObject, FlutterPlugin, FlutterStreamHandle
         try DownloadSaver.save(path: str("path"), fileName: a["fileName"] as? String)
       }
 
+    // ---- images ----
+    case "getImageInfo":
+      dispatch(result, "image_info_failed") { try ImageEngine.info(path: str("path")) }
+
+    case "compressImage":
+      dispatch(result, "image_compress_failed") {
+        try ImageEngine.compress(
+          path: str("path"),
+          config: ImageConfig(map: a["config"] as! [String: Any]),
+          outputPath: a["outputPath"] as? String)
+      }
+
     default:
       result(FlutterMethodNotImplemented)
     }

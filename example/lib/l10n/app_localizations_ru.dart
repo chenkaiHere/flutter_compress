@@ -117,6 +117,30 @@ class AppLocalizationsRu extends AppLocalizations {
       'Сильное сжатие — для очень маленьких файлов.';
 
   @override
+  String get navVideo => 'Видео';
+
+  @override
+  String get navImage => 'Изображение';
+
+  @override
+  String get imageTitle => 'Сжатие изображений';
+
+  @override
+  String get inputImage => 'Исходное изображение';
+
+  @override
+  String get pickImage => 'Выбрать изображение';
+
+  @override
+  String get reselectImage => 'Выбрать другое изображение';
+
+  @override
+  String get format => 'Формат';
+
+  @override
+  String get targetSizeKb => 'Целевой размер (КБ)';
+
+  @override
   String get off => 'выкл';
 
   @override

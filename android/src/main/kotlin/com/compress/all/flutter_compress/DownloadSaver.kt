@@ -10,15 +10,11 @@ import java.io.File
 /**
  * Copies a file into the public Downloads collection. MediaStore on Android 10+
  * (no runtime permission); direct file write + WRITE_EXTERNAL_STORAGE below that.
- * [mimeType] is a parameter so images can reuse this later.
+ * The MIME type is inferred from the file name so images aren't mislabeled as
+ * video (which would make the system treat a .jpg as a movie).
  */
 object DownloadSaver {
-    fun save(
-        context: Context,
-        path: String,
-        fileName: String?,
-        mimeType: String = "video/mp4",
-    ): String {
+    fun save(context: Context, path: String, fileName: String?): String {
         val src = File(path)
         val name = fileName ?: src.name
 
@@ -32,7 +28,7 @@ object DownloadSaver {
         val resolver = context.contentResolver
         val pending = ContentValues().apply {
             put(MediaStore.Downloads.DISPLAY_NAME, name)
-            put(MediaStore.Downloads.MIME_TYPE, mimeType)
+            put(MediaStore.Downloads.MIME_TYPE, mimeFor(name))
             put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
             put(MediaStore.Downloads.IS_PENDING, 1)
         }
@@ -45,4 +41,16 @@ object DownloadSaver {
         )
         return uri.toString()
     }
+
+    private fun mimeFor(name: String): String = when (name.substringAfterLast('.', "").lowercase()) {
+        "jpg", "jpeg" -> "image/jpeg"
+        "png" -> "image/png"
+        "webp" -> "image/webp"
+        "heic", "heif" -> "image/heic"
+        "mp4", "m4v" -> "video/mp4"
+        "mov" -> "video/quicktime"
+        "webm" -> "video/webm"
+        else -> "application/octet-stream"
+    }
 }
+

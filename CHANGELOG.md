@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.1.0
+
+Adds **image compression** — a separate API from video, so the two never mix.
+
+- `compressImage` / `compressImages` / `getImageInfo` with `ImageCompressConfig`.
+- Formats: JPEG, PNG, WebP, HEIC (auto-fallback where a format isn't supported).
+- Compress by **target size** (precise, iterative) or **quality**, plus resolution caps and optional EXIF keep.
+- Engines: `Bitmap` (Android), ImageIO (iOS), Canvas (Web).
+- Example app gains an image tab with the same responsive wide-screen layout.
+
 ## 1.0.1
 
 - Docs and pub.dev metadata polish (`dart format`, shorter description). No API or behavior changes.

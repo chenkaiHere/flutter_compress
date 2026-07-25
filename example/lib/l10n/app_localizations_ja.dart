@@ -114,6 +114,30 @@ class AppLocalizationsJa extends AppLocalizations {
   String get finenessHintCoarse => '高圧縮 — 極小サイズ向け。';
 
   @override
+  String get navVideo => '動画';
+
+  @override
+  String get navImage => '画像';
+
+  @override
+  String get imageTitle => '画像圧縮';
+
+  @override
+  String get inputImage => '入力画像';
+
+  @override
+  String get pickImage => '画像を選択';
+
+  @override
+  String get reselectImage => '画像を選び直す';
+
+  @override
+  String get format => '形式';
+
+  @override
+  String get targetSizeKb => '目標サイズ (KB)';
+
+  @override
   String get off => 'オフ';
 
   @override
