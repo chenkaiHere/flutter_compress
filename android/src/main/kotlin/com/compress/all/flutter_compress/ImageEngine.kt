@@ -28,19 +28,25 @@ class ImageEngine(private val context: Context) {
         )
     }
 
-    fun compress(path: String, config: ImageConfig, outputPath: String?): Map<String, Any?> {
+    fun compress(
+        path: String,
+        config: ImageConfig,
+        outputDir: String?,
+        outputName: String?,
+    ): Map<String, Any?> {
         val originalSize = File(path).length()
         var bmp = decodeScaled(path, config.maxWidth, config.maxHeight)
 
-        // HEIC has no simple built-in Bitmap encoder → fall back to JPEG.
-        val requested = config.format
-        val effective = if (requested == "heic") "jpeg" else requested
-        val lossy = effective == "jpeg" || effective == "webp"
+        // A null format keeps the source's format.
+        val effective = resolveFormat(config.format ?: sourceFormat(path))
+        // PNG is inherently lossless; lossless mode also disables quality search.
+        val lossy = !config.lossless && (effective == "jpeg" || effective == "webp")
 
-        val targetBytes = config.targetSizeKB?.let { it * 1024 }
+        // A target size can't be honored losslessly — ignore it in that case.
+        val targetBytes = if (config.lossless) null else config.targetSizeKB?.let { it * 1024 }
         var bytes: ByteArray
         if (targetBytes == null) {
-            bytes = encode(bmp, effective, if (lossy) config.quality else 100)
+            bytes = encode(bmp, effective, if (lossy) config.quality else 100, config.lossless)
         } else {
             // Fit to target: search quality (lossy), then downscale if still over.
             bytes = fitToTarget(bmp, effective, lossy, targetBytes)
@@ -52,7 +58,22 @@ class ImageEngine(private val context: Context) {
             }
         }
 
-        val out = context.resolveOutput(outputPath, "img_${System.nanoTime()}.${ext(effective)}")
+        // Re-encoding can end up larger than the source (already-compressed
+        // input, or lossless). If so, hand back the untouched original.
+        if (config.keepOriginalIfLarger && bytes.size >= originalSize) {
+            val src = info(path)
+            return mapOf(
+                "outputPath" to path,
+                "originalSizeBytes" to originalSize,
+                "compressedSizeBytes" to originalSize,
+                "width" to (src["width"] ?: bmp.width),
+                "height" to (src["height"] ?: bmp.height),
+                "format" to (src["format"] ?: effective),
+                "skipped" to true,
+            )
+        }
+
+        val out = context.resolveOutput(outputDir, outputName, path, ext(effective))
         out.writeBytes(bytes)
         if (config.keepExif && effective == "jpeg") copyExif(path, out.absolutePath)
 
@@ -63,7 +84,29 @@ class ImageEngine(private val context: Context) {
             "width" to bmp.width,
             "height" to bmp.height,
             "format" to effective,
+            "skipped" to false,
         )
+    }
+
+    /**
+     * The format actually encoded. The request is always kept — JPEG stays JPEG,
+     * PNG stays PNG, WebP stays WebP — except HEIC, which Android's Bitmap stack
+     * can't encode, so it falls back to JPEG. (JPEG has no lossless mode; in
+     * lossless mode it is simply encoded at maximum quality.)
+     */
+    private fun resolveFormat(requested: String): String =
+        if (requested == "heic") "jpeg" else requested
+
+    /** Detect the source image's format (used when no format is requested). */
+    private fun sourceFormat(path: String): String {
+        val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(path, opts)
+        return when (opts.outMimeType?.removePrefix("image/")?.lowercase()) {
+            "png" -> "png"
+            "webp" -> "webp"
+            "heic", "heif" -> "heic"
+            else -> "jpeg"
+        }
     }
 
     // ---- helpers -----------------------------------------------------------
@@ -98,29 +141,32 @@ class ImageEngine(private val context: Context) {
 
     /** Binary-search the quality for lossy formats; PNG is just encoded once. */
     private fun fitToTarget(bmp: Bitmap, format: String, lossy: Boolean, target: Int): ByteArray {
-        if (!lossy) return encode(bmp, format, 100)
+        if (!lossy) return encode(bmp, format, 100, lossless = false)
         var lo = 1
         var hi = 100
         var best: ByteArray? = null
         while (lo <= hi) {
             val q = (lo + hi) / 2
-            val bytes = encode(bmp, format, q)
+            val bytes = encode(bmp, format, q, lossless = false)
             if (bytes.size <= target) { best = bytes; lo = q + 1 } else hi = q - 1
         }
-        return best ?: encode(bmp, format, 1)
+        return best ?: encode(bmp, format, 1, lossless = false)
     }
 
-    private fun encode(bmp: Bitmap, format: String, quality: Int): ByteArray {
+    private fun encode(bmp: Bitmap, format: String, quality: Int, lossless: Boolean): ByteArray {
         val bos = ByteArrayOutputStream()
-        bmp.compress(compressFormat(format), quality, bos)
+        bmp.compress(compressFormat(format, lossless), quality, bos)
         return bos.toByteArray()
     }
 
     @Suppress("DEPRECATION")
-    private fun compressFormat(format: String): Bitmap.CompressFormat = when (format) {
+    private fun compressFormat(format: String, lossless: Boolean): Bitmap.CompressFormat = when (format) {
         "png" -> Bitmap.CompressFormat.PNG
-        "webp" -> if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R)
-            Bitmap.CompressFormat.WEBP_LOSSY else Bitmap.CompressFormat.WEBP
+        "webp" -> if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            if (lossless) Bitmap.CompressFormat.WEBP_LOSSLESS else Bitmap.CompressFormat.WEBP_LOSSY
+        } else {
+            Bitmap.CompressFormat.WEBP
+        }
         else -> Bitmap.CompressFormat.JPEG
     }
 

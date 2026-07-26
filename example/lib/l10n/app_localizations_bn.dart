@@ -138,7 +138,17 @@ class AppLocalizationsBn extends AppLocalizations {
   String get format => 'ফরম্যাট';
 
   @override
+  String get formatOriginal => 'মূল';
+
+  @override
   String get targetSizeKb => 'লক্ষ্য আকার (KB)';
+
+  @override
+  String get modeVisualLossless => 'লসলেস';
+
+  @override
+  String get visualLosslessHint =>
+      'ভিজ্যুয়ালি লসলেস — JPEG-ও ছোট করে, দেখতে অভিন্ন।';
 
   @override
   String get off => 'বন্ধ';

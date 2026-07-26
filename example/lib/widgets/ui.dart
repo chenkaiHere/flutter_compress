@@ -81,12 +81,15 @@ class Pill extends StatelessWidget {
             color: selected ? Colors.transparent : c.pillBorder,
           ),
         ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: selected ? c.onAccent : c.textSecondary,
-            fontWeight: dense ? FontWeight.w600 : FontWeight.w700,
-            fontSize: dense ? 13 : 14,
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            label,
+            style: TextStyle(
+              color: selected ? c.onAccent : c.textSecondary,
+              fontWeight: dense ? FontWeight.w600 : FontWeight.w700,
+              fontSize: dense ? 13 : 14,
+            ),
           ),
         ),
       ),
@@ -125,24 +128,29 @@ class ModeToggle extends StatelessWidget {
             color: selected ? Colors.transparent : c.pillBorder,
           ),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              size: 18,
-              color: selected ? c.onAccent : c.textSecondary,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: TextStyle(
+        // scaleDown so a longer label (e.g. a third mode) never overflows on
+        // narrow phones — it shrinks to fit instead.
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                size: 18,
                 color: selected ? c.onAccent : c.textSecondary,
-                fontWeight: FontWeight.w700,
-                fontSize: 15,
               ),
-            ),
-          ],
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: TextStyle(
+                  color: selected ? c.onAccent : c.textSecondary,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 15,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

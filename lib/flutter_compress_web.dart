@@ -130,8 +130,12 @@ class FlutterCompressWeb extends FlutterCompressPlatform {
     String id,
     String path,
     VideoCompressConfig config,
-    String? outputPath,
+    String? outputDir,
+    String? outputName,
   ) async {
+    // On the web there is no filesystem: the output is a blob: URL and the
+    // download name is chosen at saveToDownloads time, so outputDir/outputName
+    // don't apply here. Video is always mp4 (mp4-muxer).
     await _ensureLoaded();
     _busy = true;
     try {
@@ -238,8 +242,11 @@ class FlutterCompressWeb extends FlutterCompressPlatform {
   Future<ImageCompressResult> compressImage(
     String path,
     ImageCompressConfig config,
-    String? outputPath,
+    String? outputDir,
+    String? outputName,
   ) async {
+    // Web output is a blob: URL; outputDir/outputName don't apply. A null
+    // config.format tells the JS engine to keep the source's format.
     await _ensureImageLoaded();
     final cfg = config.toMap().jsify()! as JSObject;
     final res = (await _jsCompressImage(path, cfg).toDart).dartify() as Map;

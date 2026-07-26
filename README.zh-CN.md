@@ -128,6 +128,7 @@ print('节省 ${result.savedPercent.toStringAsFixed(1)}% → ${result.outputPath
 | `trim`                             | `TrimRange(startMs, endMs)`。               |
 | `alignment`                        | `auto16`(默认)对齐到 `÷16`,避免边缘伪影。              |
 | `keepOriginalIfLarger`             | 压缩无益时返回原文件。                                |
+| `container`                        | `auto`(默认)尽量保持源容器(iOS 保 `.mov`/`.mp4`;Android/Web 只能 `.mp4`),或 `mp4` 强制。 |
 
 ## API
 
@@ -145,6 +146,7 @@ final result = await api.compress(
   onProgress: (p) => print(p.progress),   // 0.0–1.0
   cancellationToken: token,
   outputDirectory: dir,                    // 可选
+  outputName: 'my_clip',                   // 可选;不带扩展名,自动补
 );
 await token.cancel();                      // 中止上面的任务
 
@@ -169,32 +171,36 @@ final api = FlutterCompress.instance;
 final ImageMeta meta = await api.getImageInfo(path);
 
 // 压到目标大小(精确 —— 图片编码极快,引擎会二分质量,必要时再降分辨率压到目标以内)
+// 不传 `format` 时,输出保持源文件格式。
 final ImageCompressResult r = await api.compressImage(
   path,
   const ImageCompressConfig(
-    format: ImageFormat.jpeg,   // jpeg / png / webp / heic
     targetSizeKB: 200,          // 最高优先级的体积控制
     maxWidth: 2560,             // 只缩不放
     maxHeight: 2560,
   ),
   outputDirectory: dir,         // 可选;null → 插件缓存
+  outputName: 'my_photo',       // 可选;不带扩展名,自动补
 );
 print('${r.format} ${r.width}x${r.height} • 节省 ${r.savedPercent.toStringAsFixed(1)}%');
 
-// 也可直接控质量,或批量:
-await api.compressImage(path, const ImageCompressConfig(quality: 80));
-await api.compressImages(paths, const ImageCompressConfig(format: ImageFormat.webp));
+// 也可转格式、控质量、走无损,或批量:
+await api.compressImage(path, const ImageCompressConfig(format: ImageFormat.webp, quality: 80));
+await api.compressImageLossless(path);   // 保持源格式、像素级
+await api.compressImages(paths, const ImageCompressConfig(targetSizeKB: 300));
 ```
 
-`ImageCompressConfig` —— 优先级为 `targetSizeKB` → `quality`:
+`ImageCompressConfig` —— 优先级为 `lossless` → `targetSizeKB` → `quality`:
 
 | 字段                       | 含义                                   |
 |--------------------------|--------------------------------------|
-| `format`                 | `jpeg`(默认)/ `png` / `webp` / `heic`。 |
+| `format`                 | `null`(默认)保持**源格式**;或 `jpeg` / `png` / `webp` / `heic`。 |
 | `targetSizeKB`           | 目标输出大小,引擎迭代压到该值或略低。                  |
 | `quality`                | 1–100,`targetSizeKB` 为空时生效(PNG 忽略)。  |
+| `lossless`               | 无损编码(PNG 真无损;JPEG 保持 JPEG、用最高画质)。忽略 `quality`/`targetSizeKB`。 |
 | `maxWidth` / `maxHeight` | 尺寸上限;保持比例、只缩不放。                      |
 | `keepExif`               | 保留 EXIF(方向、GPS…),默认剥离。               |
+| `keepOriginalIfLarger`   | 压缩无益时返回原文件(标记 `skipped`)。默认开启。       |
 
 ## 各平台配置
 

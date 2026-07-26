@@ -138,7 +138,17 @@ class AppLocalizationsUr extends AppLocalizations {
   String get format => 'فارمیٹ';
 
   @override
+  String get formatOriginal => 'اصل';
+
+  @override
   String get targetSizeKb => 'ہدف سائز (KB)';
+
+  @override
+  String get modeVisualLossless => 'بلا نقصان';
+
+  @override
+  String get visualLosslessHint =>
+      'بصری طور پر بلا نقصان — JPEG کو بھی چھوٹا کرتا ہے، دیکھنے میں یکساں۔';
 
   @override
   String get off => 'بند';

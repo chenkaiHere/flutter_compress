@@ -137,7 +137,17 @@ class AppLocalizationsAr extends AppLocalizations {
   String get format => 'الصيغة';
 
   @override
+  String get formatOriginal => 'الأصلي';
+
+  @override
   String get targetSizeKb => 'الحجم المستهدف (كيلوبايت)';
+
+  @override
+  String get modeVisualLossless => 'بدون فقدان';
+
+  @override
+  String get visualLosslessHint =>
+      'بلا فقدان مرئي — يصغّر JPEG أيضًا ويبدو مطابقًا.';
 
   @override
   String get off => 'إيقاف';

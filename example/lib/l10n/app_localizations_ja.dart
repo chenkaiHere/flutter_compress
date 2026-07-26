@@ -135,7 +135,16 @@ class AppLocalizationsJa extends AppLocalizations {
   String get format => '形式';
 
   @override
+  String get formatOriginal => '元の形式';
+
+  @override
   String get targetSizeKb => '目標サイズ (KB)';
+
+  @override
+  String get modeVisualLossless => 'ロスレス';
+
+  @override
+  String get visualLosslessHint => '視覚的にロスレス — JPEG も小さくなり、見た目は同じ。';
 
   @override
   String get off => 'オフ';

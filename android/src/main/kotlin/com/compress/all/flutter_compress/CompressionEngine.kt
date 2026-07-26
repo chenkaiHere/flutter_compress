@@ -65,7 +65,8 @@ class CompressionEngine(
         id: String,
         path: String,
         config: CompressionConfig,
-        outputPath: String? = null,
+        outputDir: String? = null,
+        outputName: String? = null,
     ): Map<String, Any?> {
         val info = MediaProbe.videoInfo(path)
         val srcW = info["width"] as Int
@@ -76,7 +77,9 @@ class CompressionEngine(
         val videoMime = resolveVideoMime(config.codec)
         val usedCodec = if (videoMime == MimeTypes.VIDEO_H265) "h265" else "h264"
         val videoBps = SizeMath.videoBitrateBps(config, durationMs, info["bitrateKbps"] as Int, th)
-        val outFile = resolveOutputFile(outputPath, id)
+        // Android's Media3 muxer only produces mp4, so the extension is always
+        // mp4 regardless of the requested container.
+        val outFile = context.resolveOutput(outputDir, outputName, path, "mp4")
 
         runTransformer(id, buildEditedItem(path, config, tw, th), outFile, videoMime, videoBps)
 
@@ -219,16 +222,6 @@ class CompressionEngine(
     private fun resolveVideoMime(codec: String): String {
         val hasHevc = EncoderUtil.getSupportedEncoders(MimeTypes.VIDEO_H265).isNotEmpty()
         return if (codec == "h265" && hasHevc) MimeTypes.VIDEO_H265 else MimeTypes.VIDEO_H264
-    }
-
-    /** Use [outputPath] only when it's a real writable filesystem path; otherwise
-     * (null / a `content://` SAF path / read-only) fall back to the cache so the
-     * muxer always gets a path it can write. */
-    private fun resolveOutputFile(outputPath: String?, id: String): File {
-        val fallback = File(context.compressCacheDir(), "vc_$id.mp4")
-        if (outputPath == null || !outputPath.startsWith("/")) return fallback
-        val target = File(outputPath).also { it.parentFile?.mkdirs() }
-        return if (target.parentFile?.canWrite() == true) target else fallback
     }
 
     private fun describe(e: ExportException): String = buildString {

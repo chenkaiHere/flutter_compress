@@ -19,20 +19,25 @@ enum ImageFormat {
 
 /// Image compression request.
 ///
-/// Priority: [targetSizeKB] (iterative, precise) > [quality].
+/// Priority: [lossless] > [targetSizeKB] (iterative, precise) > [quality].
 class ImageCompressConfig {
   const ImageCompressConfig({
-    this.format = ImageFormat.jpeg,
+    this.format,
     this.quality = 85,
     this.targetSizeKB,
     this.maxWidth,
     this.maxHeight,
     this.keepExif = false,
+    this.lossless = false,
+    this.keepOriginalIfLarger = true,
   })  : assert(quality >= 1 && quality <= 100, 'quality must be 1–100'),
         assert(targetSizeKB == null || targetSizeKB > 0);
 
-  /// Output format. Defaults to [ImageFormat.jpeg].
-  final ImageFormat format;
+  /// Output format. When `null` (the default), the **source's format is kept**
+  /// (a PNG stays PNG, a JPEG stays JPEG); set it only to convert to a specific
+  /// format. HEIC without a platform encoder falls back to JPEG; the real
+  /// output format is reported on [ImageCompressResult.format].
+  final ImageFormat? format;
 
   /// 1–100 quality, used when [targetSizeKB] is null (ignored for PNG).
   final int quality;
@@ -49,13 +54,32 @@ class ImageCompressConfig {
   /// Keep EXIF metadata (orientation, GPS, …). Default strips it.
   final bool keepExif;
 
+  /// Encode losslessly (pixel-for-pixel). When true, [quality] and
+  /// [targetSizeKB] are ignored — you can't lossless-encode to an arbitrary
+  /// size. The output **format is preserved**: PNG is truly lossless;
+  /// [ImageFormat.webp] uses its lossless mode where the platform supports it;
+  /// [ImageFormat.jpeg] has no lossless mode, so it stays JPEG encoded at
+  /// maximum quality (100). ([ImageFormat.heic] still falls back to JPEG on
+  /// platforms without a HEIC encoder.) [maxWidth] / [maxHeight] still apply if
+  /// set — "lossless" refers to the encode, not the resize.
+  final bool lossless;
+
+  /// If the compressed output would be **larger** than the source (common when
+  /// re-encoding an already-compressed JPEG, or with lossless), keep the
+  /// original untouched and mark the result [ImageCompressResult.skipped].
+  /// Defaults to `true`. [ImageCompressResult.outputPath] then points at the
+  /// source, with its original size/format/dimensions.
+  final bool keepOriginalIfLarger;
+
   Map<String, dynamic> toMap() => {
-        'format': format.name,
+        'format': format?.name,
         'quality': quality,
         'targetSizeKB': targetSizeKB,
         'maxWidth': maxWidth,
         'maxHeight': maxHeight,
         'keepExif': keepExif,
+        'lossless': lossless,
+        'keepOriginalIfLarger': keepOriginalIfLarger,
       };
 }
 
@@ -94,6 +118,7 @@ class ImageCompressResult {
     required this.width,
     required this.height,
     required this.format,
+    this.skipped = false,
   });
 
   final String outputPath;
@@ -105,6 +130,11 @@ class ImageCompressResult {
   /// The format actually written ("jpeg"/"png"/"webp"/"heic") — may differ
   /// from the request if a fallback occurred.
   final String format;
+
+  /// True when compression was skipped because it would not have reduced size
+  /// (see [ImageCompressConfig.keepOriginalIfLarger]); [outputPath] then points
+  /// at the untouched source.
+  final bool skipped;
 
   double get compressionRatio =>
       originalSizeBytes == 0 ? 1 : compressedSizeBytes / originalSizeBytes;
@@ -119,5 +149,6 @@ class ImageCompressResult {
         width: (m['width'] as num).toInt(),
         height: (m['height'] as num).toInt(),
         format: m['format'] as String,
+        skipped: m['skipped'] as bool? ?? false,
       );
 }

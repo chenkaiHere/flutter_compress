@@ -22,16 +22,19 @@ enum ImageEngine {
     ]
   }
 
-  static func compress(path: String, config: ImageConfig, outputPath: String?) throws
-    -> [String: Any]
-  {
+  static func compress(
+    path: String, config: ImageConfig, outputDir: String?, outputName: String?
+  ) throws -> [String: Any] {
     guard let src = CGImageSourceCreateWithURL(URL(fileURLWithPath: path) as CFURL, nil) else {
       throw err("Cannot read image")
     }
     let originalSize = (try? FileManager.default.attributesOfItem(atPath: path)[.size] as? Int64) ?? 0
 
-    // ImageIO can't encode WebP; HEIC only where the device supports it.
-    var effective = config.format == "webp" ? "jpeg" : config.format
+    // A nil format keeps the source's format. ImageIO can't encode WebP → JPEG;
+    // JPEG stays JPEG, PNG stays PNG. (JPEG/HEIC have no lossless mode, so
+    // lossless just encodes them at max quality below.)
+    let requested = config.format ?? sourceFormat(src)
+    var effective = requested == "webp" ? "jpeg" : requested
     var uti = self.uti(for: effective)
     if effective == "heic" && CGImageDestinationCreateWithData(
       NSMutableData(), uti as CFString, 1, nil) == nil {
@@ -39,25 +42,42 @@ enum ImageEngine {
       uti = self.uti(for: "jpeg")
     }
     let lossy = effective != "png"
+    // Lossless: PNG is truly lossless; JPEG/HEIC keep their format at max quality.
+    let quality = config.lossless ? 100 : config.quality
 
     // Initial max pixel size from the requested caps (0 = keep source size).
     var maxPixel = maxPixelSize(src, config.maxWidth, config.maxHeight)
     let exif = config.keepExif ? metadata(from: src) : nil
-    let target = config.targetSizeKB.map { $0 * 1024 }
+    // A target size can't be honored losslessly — ignore it in that case.
+    let target = config.lossless ? nil : config.targetSizeKB.map { $0 * 1024 }
 
     var image = try thumbnail(src, maxPixel)
-    var data = fit(image, uti, lossy, config.quality, target, exif)
+    var data = fit(image, uti, lossy, quality, target, exif)
     var tries = 0
     while let t = target, data.count > t, tries < 5, image.width > 32 {
       maxPixel = Int(Double(max(image.width, image.height)) * 0.75)
       image = try thumbnail(src, maxPixel)
-      data = fit(image, uti, lossy, config.quality, target, exif)
+      data = fit(image, uti, lossy, quality, target, exif)
       tries += 1
     }
 
-    let out = PluginFiles.cacheDir()
-      .appendingPathComponent("img_\(Int(Date().timeIntervalSince1970 * 1000)).\(ext(effective))")
-    let dest = (outputPath.map { URL(fileURLWithPath: $0) }) ?? out
+    // Re-encoding can end up larger than the source (already-compressed input,
+    // or lossless). If so, hand back the untouched original.
+    if config.keepOriginalIfLarger && Int64(data.count) >= originalSize {
+      let src = try? info(path: path)
+      return [
+        "outputPath": path,
+        "originalSizeBytes": originalSize,
+        "compressedSizeBytes": originalSize,
+        "width": (src?["width"] as? Int) ?? image.width,
+        "height": (src?["height"] as? Int) ?? image.height,
+        "format": (src?["format"] as? String) ?? effective,
+        "skipped": true,
+      ]
+    }
+
+    let dest = PluginFiles.resolveOutput(
+      outputDir: outputDir, outputName: outputName, sourcePath: path, ext: ext(effective))
     try? FileManager.default.createDirectory(
       at: dest.deletingLastPathComponent(), withIntermediateDirectories: true)
     try data.write(to: dest)
@@ -69,6 +89,7 @@ enum ImageEngine {
       "width": image.width,
       "height": image.height,
       "format": effective,
+      "skipped": false,
     ]
   }
 
@@ -143,6 +164,16 @@ enum ImageEngine {
     if let e = all[kCGImagePropertyExifDictionary] { out[kCGImagePropertyExifDictionary] = e }
     if let g = all[kCGImagePropertyGPSDictionary] { out[kCGImagePropertyGPSDictionary] = g }
     return out
+  }
+
+  /// Detect the source image's format (used when no format is requested).
+  private static func sourceFormat(_ src: CGImageSource) -> String {
+    switch (CGImageSourceGetType(src) as String?)?.lowercased() {
+    case let t? where t.contains("png"): return "png"
+    case let t? where t.contains("webp"): return "webp"
+    case let t? where t.contains("heic") || t.contains("heif"): return "heic"
+    default: return "jpeg"
+    }
   }
 
   private static func uti(for format: String) -> String {

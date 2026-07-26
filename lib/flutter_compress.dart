@@ -64,15 +64,20 @@ class FlutterCompress {
   /// [onProgress] receives events for this job only. Provide a
   /// [cancellationToken] to abort mid-flight.
   ///
-  /// [outputDirectory] chooses where the encoded file is written; the filename
-  /// is derived from the job id. When null, the plugin uses its own cache
-  /// directory (call [clearCache] to reclaim it).
+  /// [outputDirectory] chooses where the encoded file is written; when null the
+  /// plugin uses its own cache directory (call [clearCache] to reclaim it).
+  ///
+  /// [outputName] sets the output file name **without extension** — the correct
+  /// extension is appended automatically from the actual container (see
+  /// [VideoCompressConfig.container]). When null, the name defaults to the
+  /// source's base name plus a timestamp.
   Future<VideoCompressResult> compress(
     String path,
     VideoCompressConfig config, {
     void Function(CompressionProgress)? onProgress,
     CancellationToken? cancellationToken,
     String? outputDirectory,
+    String? outputName,
   }) async {
     final id = _newId();
     cancellationToken?._bind(id);
@@ -81,23 +86,17 @@ class FlutterCompress {
       throw VideoCompressCancelledException();
     }
 
-    final outputPath = outputDirectory == null
-        ? null
-        : '${_stripTrailingSlash(outputDirectory)}/$id.mp4';
-
     StreamSubscription<CompressionProgress>? sub;
     if (onProgress != null) {
       sub = progressStream.where((p) => p.id == id).listen(onProgress);
     }
     try {
-      return await _platform.compress(id, path, config, outputPath);
+      return await _platform.compress(
+          id, path, config, outputDirectory, outputName);
     } finally {
       await sub?.cancel();
     }
   }
-
-  String _stripTrailingSlash(String dir) =>
-      dir.endsWith('/') ? dir.substring(0, dir.length - 1) : dir;
 
   /// Compress a list of videos sequentially, reporting per-item results.
   ///
@@ -158,19 +157,51 @@ class FlutterCompress {
   ///
   /// With [ImageCompressConfig.targetSizeKB] the native engine iterates to land
   /// at or just under the target (accurate, since images encode fast).
+  ///
   /// [outputDirectory] chooses where to write; null uses the plugin cache.
+  /// [outputName] sets the file name **without extension** — the correct
+  /// extension is appended from the actual output format (which follows the
+  /// source when [ImageCompressConfig.format] is null). When null, the name
+  /// defaults to the source's base name plus a timestamp.
   Future<ImageCompressResult> compressImage(
     String path,
     ImageCompressConfig config, {
     String? outputDirectory,
+    String? outputName,
   }) {
-    final outputPath = outputDirectory == null
-        ? null
-        : '${_stripTrailingSlash(outputDirectory)}/${_newId()}.${_ext(config.format)}';
-    return _platform.compressImage(path, config, outputPath);
+    return _platform.compressImage(path, config, outputDirectory, outputName);
   }
 
-  /// Compress a list of images sequentially.
+  /// Compress an image **losslessly** (pixel-for-pixel) — a convenience wrapper
+  /// over [compressImage] with `lossless: true`. [quality] / `targetSizeKB`
+  /// don't apply. The format is preserved: PNG is truly lossless, WebP uses its
+  /// lossless mode where supported, and JPEG stays JPEG at maximum quality.
+  /// Omit [format] to keep the source's format.
+  Future<ImageCompressResult> compressImageLossless(
+    String path, {
+    ImageFormat? format,
+    int? maxWidth,
+    int? maxHeight,
+    bool keepExif = false,
+    String? outputDirectory,
+    String? outputName,
+  }) {
+    return compressImage(
+      path,
+      ImageCompressConfig(
+        format: format,
+        lossless: true,
+        maxWidth: maxWidth,
+        maxHeight: maxHeight,
+        keepExif: keepExif,
+      ),
+      outputDirectory: outputDirectory,
+      outputName: outputName,
+    );
+  }
+
+  /// Compress a list of images sequentially. Each output is auto-named from its
+  /// own source (base name + timestamp).
   Future<List<ImageCompressResult>> compressImages(
     List<String> paths,
     ImageCompressConfig config, {
@@ -182,13 +213,6 @@ class FlutterCompress {
     }
     return out;
   }
-
-  String _ext(ImageFormat f) => switch (f) {
-        ImageFormat.jpeg => 'jpg',
-        ImageFormat.png => 'png',
-        ImageFormat.webp => 'webp',
-        ImageFormat.heic => 'heic',
-      };
 
   // ========================================================================
 

@@ -297,13 +297,15 @@
     return info;
   };
 
-  // cfg: { format, quality, targetSizeKB, maxWidth, maxHeight }
+  // cfg: { format, quality, targetSizeKB, maxWidth, maxHeight, lossless }
   NS.compressImage = async function (url, cfg) {
     const blob = await (await fetch(url)).blob();
     const bmp = await createImageBitmap(blob);
 
-    // Canvas can't encode HEIC; WebP only where the browser supports it.
-    let fmt = cfg.format === 'heic' ? 'jpeg' : cfg.format;
+    // A null/absent format keeps the source's format. Canvas can't encode HEIC
+    // → JPEG; unknowns → JPEG. Otherwise the requested format is kept.
+    let fmt = cfg.format || (blob.type ? blob.type.replace('image/', '') : 'jpeg');
+    if (fmt !== 'png' && fmt !== 'webp') fmt = 'jpeg';  // jpeg/jpg/heic/unknown
     const mime = fmt === 'png' ? 'image/png' : fmt === 'webp' ? 'image/webp' : 'image/jpeg';
     const lossy = fmt !== 'png';
 
@@ -322,8 +324,10 @@
     function toBlob(canvas, q) {
       return new Promise((res) => canvas.toBlob((b) => res(b), mime, lossy ? q : undefined));
     }
+    // Lossless → max quality (1.0); PNG ignores it and stays truly lossless.
+    const baseQ = cfg.lossless ? 1 : (cfg.quality || 85) / 100;
     async function fit(canvas, target) {
-      if (!lossy || !target) return await toBlob(canvas, (cfg.quality || 85) / 100);
+      if (!lossy || !target) return await toBlob(canvas, baseQ);
       let lo = 1, hi = 100, best = null;
       while (lo <= hi) {
         const q = Math.floor((lo + hi) / 2);
@@ -333,7 +337,8 @@
       return best || await toBlob(canvas, 0.01);
     }
 
-    const target = cfg.targetSizeKB ? cfg.targetSizeKB * 1024 : null;
+    // A target size can't be honored losslessly — ignore it in that case.
+    const target = cfg.lossless || !cfg.targetSizeKB ? null : cfg.targetSizeKB * 1024;
     let [w, h] = fitDims(bmp.width, bmp.height);
     let canvas = draw(w, h);
     let out = await fit(canvas, target);
@@ -344,13 +349,28 @@
       out = await fit(canvas, target);
       tries++;
     }
+    if (!out) { bmp.close(); throw new Error('image encode failed'); }
+
+    // Re-encoding can end up larger than the source (already-compressed input,
+    // or lossless). If so, hand back the untouched original.
+    const keepOriginal = cfg.keepOriginalIfLarger !== false;
+    if (keepOriginal && out.size >= blob.size) {
+      const srcFmt = blob.type ? blob.type.replace('image/', '') : fmt;
+      const dims = [bmp.width, bmp.height];
+      bmp.close();
+      return {
+        outputPath: url,
+        originalSizeBytes: blob.size,
+        compressedSizeBytes: blob.size,
+        width: dims[0], height: dims[1], format: srcFmt, skipped: true,
+      };
+    }
     bmp.close();
-    if (!out) throw new Error('image encode failed');
     return {
       outputPath: URL.createObjectURL(out),
       originalSizeBytes: blob.size,
       compressedSizeBytes: out.size,
-      width: canvas.width, height: canvas.height, format: fmt,
+      width: canvas.width, height: canvas.height, format: fmt, skipped: false,
     };
   };
 

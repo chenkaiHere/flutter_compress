@@ -221,9 +221,11 @@ class _CompressPageState extends State<CompressPage> {
           ),
         );
         if (routeToDownloads) {
+          // Keep the actual output extension (auto container may yield .mov).
+          final ext = result.outputPath.split('.').last;
           final saved = await _compressor.saveToDownloads(
             result.outputPath,
-            fileName: 'compressed_${DateTime.now().millisecondsSinceEpoch}.mp4',
+            fileName: 'compressed_${DateTime.now().millisecondsSinceEpoch}.$ext',
           );
           _appendLog(l10n.logSavedToDownloads(saved));
         } else {

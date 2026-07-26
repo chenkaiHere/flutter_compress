@@ -52,7 +52,8 @@ class MethodChannelFlutterCompress extends FlutterCompressPlatform {
     String id,
     String path,
     VideoCompressConfig config,
-    String? outputPath,
+    String? outputDir,
+    String? outputName,
   ) async {
     try {
       final res = await _method.invokeMethod<Map<dynamic, dynamic>>(
@@ -61,7 +62,8 @@ class MethodChannelFlutterCompress extends FlutterCompressPlatform {
           'id': id,
           'path': path,
           'config': config.toMap(),
-          'outputPath': outputPath,
+          'outputDir': outputDir,
+          'outputName': outputName,
         },
       );
       return VideoCompressResult.fromMap(res!);
@@ -122,13 +124,15 @@ class MethodChannelFlutterCompress extends FlutterCompressPlatform {
   Future<ImageCompressResult> compressImage(
     String path,
     ImageCompressConfig config,
-    String? outputPath,
+    String? outputDir,
+    String? outputName,
   ) async {
     final res =
         await _method.invokeMethod<Map<dynamic, dynamic>>('compressImage', {
       'path': path,
       'config': config.toMap(),
-      'outputPath': outputPath,
+      'outputDir': outputDir,
+      'outputName': outputName,
     });
     return ImageCompressResult.fromMap(res!);
   }

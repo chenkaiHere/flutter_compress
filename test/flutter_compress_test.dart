@@ -19,6 +19,7 @@ void main() {
       expect(map['trim'], {'startMs': 1000, 'endMs': 5000});
       expect(map['alignment'], 'auto16');
       expect(map['keepOriginalIfLarger'], true);
+      expect(map['container'], 'auto');
     });
 
     test('defaults are sensible', () {
@@ -27,6 +28,15 @@ void main() {
       expect(map['quality'], 'medium');
       expect(map['codec'], 'h265');
       expect(map['targetSizeMB'], isNull);
+      expect(map['container'], 'auto');
+    });
+
+    test('container can be forced to mp4', () {
+      expect(
+        const VideoCompressConfig(container: VideoContainer.mp4)
+            .toMap()['container'],
+        'mp4',
+      );
     });
   });
 
@@ -75,10 +85,53 @@ void main() {
     test('defaults are sensible', () {
       const config = ImageCompressConfig();
       final map = config.toMap();
-      expect(map['format'], 'jpeg');
+      // Null format = keep the source's format.
+      expect(map['format'], isNull);
       expect(map['quality'], 85);
       expect(map['targetSizeKB'], isNull);
       expect(map['keepExif'], false);
+      expect(map['lossless'], false);
+      expect(map['keepOriginalIfLarger'], true);
+    });
+
+    test('carries the lossless flag', () {
+      const config = ImageCompressConfig(format: ImageFormat.png, lossless: true);
+      final map = config.toMap();
+      expect(map['lossless'], true);
+      expect(map['format'], 'png');
+    });
+
+    test('keepOriginalIfLarger defaults on and serializes', () {
+      expect(const ImageCompressConfig().keepOriginalIfLarger, true);
+      expect(const ImageCompressConfig().toMap()['keepOriginalIfLarger'], true);
+      expect(
+        const ImageCompressConfig(keepOriginalIfLarger: false)
+            .toMap()['keepOriginalIfLarger'],
+        false,
+      );
+    });
+
+    test('result exposes the skipped flag', () {
+      final skipped = ImageCompressResult.fromMap({
+        'outputPath': '/tmp/a.jpg',
+        'originalSizeBytes': 1000,
+        'compressedSizeBytes': 1000,
+        'width': 10,
+        'height': 10,
+        'format': 'jpeg',
+        'skipped': true,
+      });
+      expect(skipped.skipped, true);
+      // Missing key defaults to false.
+      final normal = ImageCompressResult.fromMap({
+        'outputPath': '/tmp/a.jpg',
+        'originalSizeBytes': 1000,
+        'compressedSizeBytes': 500,
+        'width': 10,
+        'height': 10,
+        'format': 'jpeg',
+      });
+      expect(normal.skipped, false);
     });
 
     test('rejects out-of-range quality', () {

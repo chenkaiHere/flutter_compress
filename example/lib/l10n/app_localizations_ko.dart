@@ -135,7 +135,16 @@ class AppLocalizationsKo extends AppLocalizations {
   String get format => '형식';
 
   @override
+  String get formatOriginal => '원본';
+
+  @override
   String get targetSizeKb => '목표 크기 (KB)';
+
+  @override
+  String get modeVisualLossless => '무손실';
+
+  @override
+  String get visualLosslessHint => '시각적 무손실 — JPEG도 줄이며 육안상 동일합니다.';
 
   @override
   String get off => '끄기';

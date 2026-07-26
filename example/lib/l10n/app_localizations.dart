@@ -370,11 +370,29 @@ abstract class AppLocalizations {
   /// **'Format'**
   String get format;
 
+  /// No description provided for @formatOriginal.
+  ///
+  /// In en, this message translates to:
+  /// **'Original'**
+  String get formatOriginal;
+
   /// No description provided for @targetSizeKb.
   ///
   /// In en, this message translates to:
   /// **'Target size (KB)'**
   String get targetSizeKb;
+
+  /// No description provided for @modeVisualLossless.
+  ///
+  /// In en, this message translates to:
+  /// **'Lossless'**
+  String get modeVisualLossless;
+
+  /// No description provided for @visualLosslessHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Visually lossless — shrinks JPEGs too, looks identical.'**
+  String get visualLosslessHint;
 
   /// No description provided for @off.
   ///

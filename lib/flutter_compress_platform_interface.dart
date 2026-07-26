@@ -42,7 +42,8 @@ abstract class FlutterCompressPlatform extends PlatformInterface {
     String id,
     String path,
     VideoCompressConfig config,
-    String? outputPath,
+    String? outputDir,
+    String? outputName,
   ) =>
       throw UnimplementedError('compress() has not been implemented.');
 
@@ -74,7 +75,8 @@ abstract class FlutterCompressPlatform extends PlatformInterface {
   Future<ImageCompressResult> compressImage(
     String path,
     ImageCompressConfig config,
-    String? outputPath,
+    String? outputDir,
+    String? outputName,
   ) =>
       throw UnimplementedError('compressImage() has not been implemented.');
 }

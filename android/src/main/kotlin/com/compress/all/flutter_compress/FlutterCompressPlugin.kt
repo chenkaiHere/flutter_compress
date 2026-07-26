@@ -71,7 +71,8 @@ class FlutterCompressPlugin :
             "compress" -> dispatch(result, "compress_failed") {
                 eng.compress(
                     call.str("id"), call.str("path"), call.config(),
-                    call.argument<String>("outputPath"),
+                    call.argument<String>("outputDir"),
+                    call.argument<String>("outputName"),
                 )
             }
 
@@ -108,7 +109,8 @@ class FlutterCompressPlugin :
                 imageEngine!!.compress(
                     call.str("path"),
                     ImageConfig.fromMap(call.argument<Map<String, Any?>>("config")!!),
-                    call.argument<String>("outputPath"),
+                    call.argument<String>("outputDir"),
+                    call.argument<String>("outputName"),
                 )
             }
 

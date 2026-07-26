@@ -8,11 +8,16 @@ import 'package:permission_handler/permission_handler.dart';
 
 import '../app_theme.dart';
 import '../l10n/app_localizations.dart';
-import '../models/compress_options.dart';
 import '../widgets/action_bar.dart';
 import '../widgets/app_header.dart';
 import '../widgets/output_card.dart';
 import '../widgets/ui.dart';
+
+/// Image size/quality intent — mutually exclusive. Local to the image page
+/// (the video page has its own SizeMode). [visualLossless] is a high-quality
+/// lossy preset ("visually lossless") that shrinks JPEGs while looking
+/// identical — distinct from the plugin's true `lossless` flag.
+enum ImgMode { targetSize, quality, visualLossless }
 
 /// Image-compression screen — parallel to the video page but driven by the
 /// separate image API (`compressImage` / `ImageCompressConfig`).
@@ -30,8 +35,9 @@ class _ImageCompressPageState extends State<ImageCompressPage> {
   ImageMeta? _info;
   String? _outputDir;
 
-  ImageFormat _format = ImageFormat.jpeg;
-  SizeMode _mode = SizeMode.targetSize;
+  /// null = keep the source's format (the plugin default).
+  ImageFormat? _format;
+  ImgMode _mode = ImgMode.targetSize;
   int _targetSizeKB = 200;
   int _quality = 85;
 
@@ -41,13 +47,21 @@ class _ImageCompressPageState extends State<ImageCompressPage> {
   bool get _isAndroid => !kIsWeb && Platform.isAndroid;
   void _appendLog(String line) => setState(() => _log = '$line\n$_log');
 
-  ImageCompressConfig _config() => ImageCompressConfig(
-        format: _format,
-        targetSizeKB: _mode == SizeMode.targetSize ? _targetSizeKB : null,
-        quality: _quality,
-        maxWidth: 2560,
-        maxHeight: 2560,
-      );
+  /// "Visually lossless" high-quality preset — high enough to be visually
+  /// indistinguishable, low enough to still shrink typical JPEGs.
+  static const _visualLosslessQuality = 90;
+
+  ImageCompressConfig _config() {
+    final visual = _mode == ImgMode.visualLossless;
+    return ImageCompressConfig(
+      format: _format,
+      targetSizeKB: _mode == ImgMode.targetSize ? _targetSizeKB : null,
+      quality: visual ? _visualLosslessQuality : _quality,
+      // Visually lossless keeps the source resolution; other modes cap it.
+      maxWidth: visual ? null : 2560,
+      maxHeight: visual ? null : 2560,
+    );
+  }
 
   Future<void> _pick() async {
     final l10n = AppLocalizations.of(context);
@@ -110,6 +124,10 @@ class _ImageCompressPageState extends State<ImageCompressPage> {
         _config(),
         outputDirectory: routeToDownloads ? null : _outputDir,
       );
+      if (r.skipped) {
+        _appendLog(l10n.logSkipped);
+        return;
+      }
       _appendLog(l10n.logDone(
         (r.compressedSizeBytes / 1024).toStringAsFixed(0),
         r.savedPercent.toStringAsFixed(1),
@@ -118,7 +136,9 @@ class _ImageCompressPageState extends State<ImageCompressPage> {
       if (routeToDownloads) {
         final saved = await _compressor.saveToDownloads(
           r.outputPath,
-          fileName: 'compressed_${DateTime.now().millisecondsSinceEpoch}.${_ext()}',
+          // Use the format actually written (lossless may fall back to PNG),
+          // so the extension — and thus the saved MIME type — is correct.
+          fileName: 'compressed_${DateTime.now().millisecondsSinceEpoch}.${_ext(r.format)}',
         );
         _appendLog(l10n.logSavedToDownloads(saved));
       } else {
@@ -131,11 +151,12 @@ class _ImageCompressPageState extends State<ImageCompressPage> {
     }
   }
 
-  String _ext() => switch (_format) {
-        ImageFormat.jpeg => 'jpg',
-        ImageFormat.png => 'png',
-        ImageFormat.webp => 'webp',
-        ImageFormat.heic => 'heic',
+  String _ext(String format) => switch (format) {
+        'jpeg' || 'jpg' => 'jpg',
+        'png' => 'png',
+        'webp' => 'webp',
+        'heic' => 'heic',
+        _ => format,
       };
 
   static const _wideBreakpoint = 900.0;
@@ -411,48 +432,64 @@ class _ImageCompressPageState extends State<ImageCompressPage> {
   }
 
   Widget _formatPills() {
+    final l10n = AppLocalizations.of(context);
+    // A leading null = "keep source format" (the plugin default).
+    final options = <ImageFormat?>[null, ...ImageFormat.values];
     return Row(
       children: [
-        for (final f in ImageFormat.values) ...[
+        for (final f in options) ...[
           Expanded(
             child: Pill(
-              label: f.name,
+              label: f?.name ?? l10n.formatOriginal,
               selected: _format == f,
               onTap: _busy ? null : () => setState(() => _format = f),
             ),
           ),
-          if (f != ImageFormat.values.last) const SizedBox(width: 8),
+          if (f != options.last) const SizedBox(width: 8),
         ],
       ],
     );
   }
 
   Widget _modeSelector(AppLocalizations l10n) {
+    Widget toggle(IconData icon, String label, ImgMode mode) => Expanded(
+          child: ModeToggle(
+            icon: icon,
+            label: label,
+            selected: _mode == mode,
+            onTap: _busy ? null : () => setState(() => _mode = mode),
+          ),
+        );
     return Row(
       children: [
-        Expanded(
-          child: ModeToggle(
-            icon: Icons.data_usage,
-            label: l10n.modeTargetSize,
-            selected: _mode == SizeMode.targetSize,
-            onTap: _busy ? null : () => setState(() => _mode = SizeMode.targetSize),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: ModeToggle(
-            icon: Icons.star_outline,
-            label: l10n.modeQuality,
-            selected: _mode == SizeMode.quality,
-            onTap: _busy ? null : () => setState(() => _mode = SizeMode.quality),
-          ),
-        ),
+        toggle(Icons.data_usage, l10n.modeTargetSize, ImgMode.targetSize),
+        const SizedBox(width: 10),
+        toggle(Icons.star_outline, l10n.modeQuality, ImgMode.quality),
+        const SizedBox(width: 10),
+        toggle(Icons.diamond_outlined, l10n.modeVisualLossless,
+            ImgMode.visualLossless),
       ],
     );
   }
 
   Widget _control(AppLocalizations l10n, AppColors c) {
-    if (_mode == SizeMode.targetSize) {
+    if (_mode == ImgMode.visualLossless) {
+      return GlassCard(
+        child: Row(
+          children: [
+            Icon(Icons.diamond_outlined, color: c.accent, size: 22),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                l10n.visualLosslessHint,
+                style: TextStyle(color: c.textSecondary, fontSize: 13, height: 1.35),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    if (_mode == ImgMode.targetSize) {
       final maxKB =
           (_info != null ? (_info!.sizeBytes / 1024).ceil() : 2000).clamp(20, 100000);
       return GlassCard(

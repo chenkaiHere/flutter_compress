@@ -139,7 +139,17 @@ class AppLocalizationsHi extends AppLocalizations {
   String get format => 'फ़ॉर्मेट';
 
   @override
+  String get formatOriginal => 'मूल';
+
+  @override
   String get targetSizeKb => 'लक्ष्य आकार (KB)';
+
+  @override
+  String get modeVisualLossless => 'बिना हानि';
+
+  @override
+  String get visualLosslessHint =>
+      'दृश्य रूप से बिना हानि — JPEG को भी छोटा करता है, दिखने में समान।';
 
   @override
   String get off => 'बंद';

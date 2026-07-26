@@ -31,6 +31,18 @@ enum CompressQuality {
   veryLow,
 }
 
+/// Output container for compressed video.
+enum VideoContainer {
+  /// Keep the source's container where the platform's muxer supports it, and
+  /// fall back to [mp4] otherwise. In practice: iOS keeps `.mov`/`.mp4`;
+  /// Android and Web can only produce `.mp4`, so non-mp4 sources become mp4.
+  /// The output extension always matches the bytes actually written.
+  auto,
+
+  /// Always write an `.mp4` (the universal container for H.264/H.265).
+  mp4,
+}
+
 /// How to reconcile output dimensions with encoder requirements.
 enum DimensionAlignment {
   /// Round width/height to the nearest multiple of 16 (only when needed).
@@ -74,6 +86,7 @@ class VideoCompressConfig {
     this.trim,
     this.alignment = DimensionAlignment.auto16,
     this.keepOriginalIfLarger = true,
+    this.container = VideoContainer.auto,
   }) : assert(
           qualityPercent == null ||
               (qualityPercent >= 1 && qualityPercent <= 100),
@@ -119,6 +132,10 @@ class VideoCompressConfig {
   /// original untouched and mark the result [VideoCompressResult.skipped].
   final bool keepOriginalIfLarger;
 
+  /// Output container. Defaults to [VideoContainer.auto] (keep the source's
+  /// container where the platform can, else mp4).
+  final VideoContainer container;
+
   Map<String, dynamic> toMap() => {
         'quality': quality.name,
         'qualityPercent': qualityPercent,
@@ -133,6 +150,7 @@ class VideoCompressConfig {
         'trim': trim?.toMap(),
         'alignment': alignment.name,
         'keepOriginalIfLarger': keepOriginalIfLarger,
+        'container': container.name,
       };
 }
 

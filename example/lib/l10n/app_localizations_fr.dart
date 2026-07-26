@@ -139,7 +139,17 @@ class AppLocalizationsFr extends AppLocalizations {
   String get format => 'Format';
 
   @override
+  String get formatOriginal => 'Original';
+
+  @override
   String get targetSizeKb => 'Taille cible (Ko)';
+
+  @override
+  String get modeVisualLossless => 'Sans perte';
+
+  @override
+  String get visualLosslessHint =>
+      'Sans perte visible — réduit aussi les JPEG, aspect identique.';
 
   @override
   String get off => 'désactivé';

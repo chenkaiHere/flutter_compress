@@ -135,7 +135,16 @@ class AppLocalizationsZh extends AppLocalizations {
   String get format => '格式';
 
   @override
+  String get formatOriginal => '原格式';
+
+  @override
   String get targetSizeKb => '目标大小 (KB)';
+
+  @override
+  String get modeVisualLossless => '无损压缩';
+
+  @override
+  String get visualLosslessHint => '视觉无损,肉眼几乎无差;JPEG 也能压小。';
 
   @override
   String get off => '关闭';

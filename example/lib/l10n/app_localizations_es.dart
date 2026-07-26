@@ -139,7 +139,17 @@ class AppLocalizationsEs extends AppLocalizations {
   String get format => 'Formato';
 
   @override
+  String get formatOriginal => 'Original';
+
+  @override
   String get targetSizeKb => 'Tamaño objetivo (KB)';
+
+  @override
+  String get modeVisualLossless => 'Sin pérdida';
+
+  @override
+  String get visualLosslessHint =>
+      'Sin pérdida visual — también reduce JPEG, se ve idéntico.';
 
   @override
   String get off => 'desactivado';

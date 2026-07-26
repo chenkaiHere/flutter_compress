@@ -49,7 +49,8 @@ final class CompressionEngine {
   // MARK: - Compress
 
   func compress(
-    id: String, path: String, config: CompressionConfig, outputPath: String? = nil,
+    id: String, path: String, config: CompressionConfig,
+    outputDir: String? = nil, outputName: String? = nil,
     completion: @escaping (CompressionOutcome) -> Void
   ) {
     lock.lock()
@@ -127,17 +128,18 @@ final class CompressionEngine {
       }
       reader.add(videoReaderOutput)
 
-      // Writer.
-      let outURL: URL
-      if let outputPath = outputPath {
-        outURL = URL(fileURLWithPath: outputPath)
-        try? FileManager.default.createDirectory(
-          at: outURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-      } else {
-        outURL = PluginFiles.cacheDir().appendingPathComponent("vc_\(id).mp4")
-      }
+      // Writer. Container: `auto` keeps a `.mov` source as `.mov` (AVFoundation
+      // supports it), everything else → `.mp4`. `mp4` always forces `.mp4`.
+      let srcExt = (path as NSString).pathExtension.lowercased()
+      let keepMov = config.container == "auto" && srcExt == "mov"
+      let fileType: AVFileType = keepMov ? .mov : .mp4
+      let ext = keepMov ? "mov" : "mp4"
+      let outURL = PluginFiles.resolveOutput(
+        outputDir: outputDir, outputName: outputName, sourcePath: path, ext: ext)
+      try? FileManager.default.createDirectory(
+        at: outURL.deletingLastPathComponent(), withIntermediateDirectories: true)
       try? FileManager.default.removeItem(at: outURL)
-      guard let writer = try? AVAssetWriter(outputURL: outURL, fileType: .mp4) else {
+      guard let writer = try? AVAssetWriter(outputURL: outURL, fileType: fileType) else {
         finish(.failure("Could not create writer")); return
       }
 

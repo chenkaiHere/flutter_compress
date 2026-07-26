@@ -138,7 +138,17 @@ class AppLocalizationsRu extends AppLocalizations {
   String get format => 'Формат';
 
   @override
+  String get formatOriginal => 'Исходный';
+
+  @override
   String get targetSizeKb => 'Целевой размер (КБ)';
+
+  @override
+  String get modeVisualLossless => 'Без потерь';
+
+  @override
+  String get visualLosslessHint =>
+      'Визуально без потерь — уменьшает и JPEG, выглядит идентично.';
 
   @override
   String get off => 'выкл';

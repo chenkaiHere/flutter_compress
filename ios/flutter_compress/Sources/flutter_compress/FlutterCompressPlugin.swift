@@ -50,9 +50,12 @@ public class FlutterCompressPlugin: NSObject, FlutterPlugin, FlutterStreamHandle
 
     case "compress":
       let config = CompressionConfig(map: a["config"] as! [String: Any])
-      let id = str("id"), path = str("path"), outputPath = a["outputPath"] as? String
+      let id = str("id"), path = str("path")
+      let outputDir = a["outputDir"] as? String, outputName = a["outputName"] as? String
       workQueue.async {
-        self.engine.compress(id: id, path: path, config: config, outputPath: outputPath) { outcome in
+        self.engine.compress(
+          id: id, path: path, config: config, outputDir: outputDir, outputName: outputName
+        ) { outcome in
           switch outcome {
           case .success(let map): result(map)
           case .cancelled:
@@ -97,7 +100,8 @@ public class FlutterCompressPlugin: NSObject, FlutterPlugin, FlutterStreamHandle
         try ImageEngine.compress(
           path: str("path"),
           config: ImageConfig(map: a["config"] as! [String: Any]),
-          outputPath: a["outputPath"] as? String)
+          outputDir: a["outputDir"] as? String,
+          outputName: a["outputName"] as? String)
       }
 
     default:

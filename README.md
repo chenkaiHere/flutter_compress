@@ -131,6 +131,7 @@ print('saved ${result.savedPercent.toStringAsFixed(1)}% → ${result.outputPath}
 | `trim`                             | `TrimRange(startMs, endMs)`.                                   |
 | `alignment`                        | `auto16` (default) rounds to `÷16` to avoid edge artifacts.    |
 | `keepOriginalIfLarger`             | Return the original if compression wouldn't help.              |
+| `container`                        | `auto` (default) keeps the source container where the platform can (iOS `.mov`/`.mp4`; Android/Web → `.mp4`), or `mp4` to force it. |
 
 ## API
 
@@ -148,6 +149,7 @@ final result = await api.compress(
   onProgress: (p) => print(p.progress),   // 0.0–1.0
   cancellationToken: token,
   outputDirectory: dir,                    // optional
+  outputName: 'my_clip',                   // optional; no extension → auto-added
 );
 await token.cancel();                      // aborts the job above
 
@@ -173,32 +175,36 @@ final ImageMeta meta = await api.getImageInfo(path);
 
 // Compress to a target size (precise — images encode fast, so the engine
 // binary-searches quality, then downscales if needed to land under it).
+// With no `format`, the output keeps the source's format.
 final ImageCompressResult r = await api.compressImage(
   path,
   const ImageCompressConfig(
-    format: ImageFormat.jpeg,   // jpeg / png / webp / heic
     targetSizeKB: 200,          // highest-priority size control
     maxWidth: 2560,             // downscale-only
     maxHeight: 2560,
   ),
   outputDirectory: dir,         // optional; null → plugin cache
+  outputName: 'my_photo',       // optional; no extension → auto-added
 );
 print('${r.format} ${r.width}x${r.height} • saved ${r.savedPercent.toStringAsFixed(1)}%');
 
-// Or control quality directly, and batch:
-await api.compressImage(path, const ImageCompressConfig(quality: 80));
-await api.compressImages(paths, const ImageCompressConfig(format: ImageFormat.webp));
+// Convert format, control quality, go lossless, or batch:
+await api.compressImage(path, const ImageCompressConfig(format: ImageFormat.webp, quality: 80));
+await api.compressImageLossless(path);   // keep source format, pixel-for-pixel
+await api.compressImages(paths, const ImageCompressConfig(targetSizeKB: 300));
 ```
 
-`ImageCompressConfig` — priority is `targetSizeKB` → `quality`:
+`ImageCompressConfig` — priority is `lossless` → `targetSizeKB` → `quality`:
 
 | Field                    | Meaning                                                       |
 |--------------------------|---------------------------------------------------------------|
-| `format`                 | `jpeg` (default) / `png` / `webp` / `heic`.                   |
+| `format`                 | `null` (default) keeps the **source** format; or `jpeg` / `png` / `webp` / `heic`. |
 | `targetSizeKB`           | Desired output size; the engine iterates to land at/under it. |
 | `quality`                | 1–100, used when `targetSizeKB` is null (ignored for PNG).    |
+| `lossless`               | Encode losslessly (PNG truly lossless; JPEG stays JPEG at max quality). Ignores `quality`/`targetSizeKB`. |
 | `maxWidth` / `maxHeight` | Cap dimensions; aspect kept, only scales down.                |
 | `keepExif`               | Keep EXIF (orientation, GPS, …); default strips it.           |
+| `keepOriginalIfLarger`   | Return the original (marked `skipped`) if compression wouldn't shrink it. Default on. |
 
 ## Platform setup
 
