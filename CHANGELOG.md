@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.1.2
+
+- Android: no longer blocks the UI thread; EXIF orientation applied; bitmaps recycled.
+- iOS: failed encodes now error instead of writing a 0-byte file; `maxWidth`/`maxHeight` respected per axis.
+- Web: codecs and output blobs are released; images no longer download as `.mp4`.
+- Add `releaseOutput(path)` to free a single result (web: revokes the blob URL).
+- Target-size search is far cheaper — one encode when the image already fits.
+
 ## 1.1.1
 
 - Add `outputName` (video & image); output name defaults to `<source>_<timestamp>`.

@@ -90,7 +90,7 @@ engine falls back to JPEG (the actual format is reported on the result).
 
 ```yaml
 dependencies:
-  flutter_compress: ^1.1.0
+  flutter_compress: ^1.1.2
 ```
 
 ## Quick start
@@ -157,6 +157,7 @@ await token.cancel();                      // aborts the job above
 await api.compressAll(paths, config);
 final String thumb = await api.getThumbnail(path, positionMs: 1000, maxWidth: 320);
 final String saved = await api.saveToDownloads(result.outputPath);
+await api.releaseOutput(result.outputPath);  // frees one result (see below)
 await api.clearCache();
 
 // Global progress feed (e.g. for a batch UI)
@@ -217,6 +218,9 @@ await api.compressImages(paths, const ImageCompressConfig(targetSizeKB: 300));
 - **Web** — needs WebCodecs (Chrome/Edge 94+, Safari 16.4+). Inputs/outputs are
   `blob:` URLs; the vendored demux/mux JS (~0.2 MB) loads lazily on first use.
   Pick a file via `file_picker` and pass `xFile.path` (a `blob:` URL on web).
+  **Call `releaseOutput(result.outputPath)`** once you've downloaded or uploaded a
+  result — the browser otherwise holds the whole encoded file in memory for the
+  life of the page (`clearCache()` releases every output at once).
   Try the [live demo](https://flutter-compress.ckdgdgdg.workers.dev/) to see it in action.
 
 ## Known limitations

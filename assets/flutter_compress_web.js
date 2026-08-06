@@ -17,6 +17,18 @@
   const cancelled = new Set();
   NS.cancel = function (id) { if (id) cancelled.add(id); };
 
+  /** Every output object URL we created, so `revokeAll` can free them. */
+  const OUTPUT_URLS = new Set();
+  function trackUrl(url) { OUTPUT_URLS.add(url); return url; }
+
+  /** Upper bound on waiting for mp4box to deliver every sample. */
+  const DEMUX_TIMEOUT_MS = 10000;
+
+  /** Release a WebCodecs encoder/decoder without masking the real error. */
+  function closeQuietly(codec) {
+    try { if (codec && codec.state !== 'closed') codec.close(); } catch (_) {}
+  }
+
   NS.isSupported = function () {
     return typeof window.VideoEncoder === 'function' &&
       typeof window.VideoDecoder === 'function' &&
@@ -235,6 +247,7 @@
     });
 
     // Collect samples and feed the decoder.
+    let fed = 0;
     const samplesReady = new Promise((resolve, reject) => {
       file.onSamples = (trackId, user, samples) => {
         try {
@@ -246,6 +259,7 @@
               duration: (s.duration * 1e6) / timescale,
               data: s.data,
             }));
+            fed++;
           }
           if (samples.length && samples[samples.length - 1].number >= totalSamples - 1) {
             resolve();
@@ -254,33 +268,48 @@
       };
     });
 
-    file.setExtractionOptions(vTrack.id, null, { nbSamples: totalSamples });
-    file.start();
-    // mp4box delivers all samples synchronously here (whole file buffered).
-    await Promise.race([samplesReady, new Promise((r) => setTimeout(r, 0))]);
+    try {
+      file.setExtractionOptions(vTrack.id, null, { nbSamples: totalSamples });
+      file.start();
+      // mp4box normally delivers every sample synchronously from start() (the
+      // whole file is buffered). Don't assume it: if it ever batches, waiting a
+      // single tick would flush the decoder early and silently truncate the
+      // output, so poll until every sample is in (bounded).
+      await Promise.race([samplesReady, new Promise((r) => setTimeout(r, 0))]);
+      const deadline = Date.now() + DEMUX_TIMEOUT_MS;
+      while (fed < totalSamples && Date.now() < deadline && !cancelled.has(id)) {
+        await new Promise((r) => setTimeout(r, 10));
+      }
 
-    await decoder.flush();
-    await encoder.flush();
-    if (encodeError) throw encodeError;
-    if (cancelled.has(id)) { cancelled.delete(id); throw new Error('cancelled'); }
+      await decoder.flush();
+      await encoder.flush();
+      if (encodeError) throw encodeError;
+      if (cancelled.has(id)) { cancelled.delete(id); throw new Error('cancelled'); }
 
-    muxer.finalize();
-    const blob = new Blob([muxer.target.buffer], { type: 'video/mp4' });
+      muxer.finalize();
+      const blob = new Blob([muxer.target.buffer], { type: 'video/mp4' });
 
-    if (cfg.keepOriginalIfLarger && cfg.originalSizeBytes > 0 &&
-        blob.size >= cfg.originalSizeBytes) {
+      if (cfg.keepOriginalIfLarger && cfg.originalSizeBytes > 0 &&
+          blob.size >= cfg.originalSizeBytes) {
+        return {
+          url: url, outputUrl: url, sizeBytes: cfg.originalSizeBytes,
+          width: srcW, height: srcH, durationMs, codec: usedCodec, skipped: true,
+        };
+      }
+
+      const outUrl = trackUrl(URL.createObjectURL(blob));
+      if (onProgress) onProgress(1, blob.size);
       return {
-        url: url, outputUrl: url, sizeBytes: cfg.originalSizeBytes,
-        width: srcW, height: srcH, durationMs, codec: usedCodec, skipped: true,
+        url: outUrl, outputUrl: outUrl, sizeBytes: blob.size,
+        width: tw, height: th, durationMs, codec: usedCodec, skipped: false,
       };
+    } finally {
+      // WebCodecs codecs hold hardware/GPU resources; leaking a pair per run
+      // makes the browser refuse to create encoders after a few compressions.
+      closeQuietly(decoder);
+      closeQuietly(encoder);
+      try { file.flush(); } catch (_) {}
     }
-
-    const outUrl = URL.createObjectURL(blob);
-    if (onProgress) onProgress(1, blob.size);
-    return {
-      url: outUrl, outputUrl: outUrl, sizeBytes: blob.size,
-      width: tw, height: th, durationMs, codec: usedCodec, skipped: false,
-    };
   };
 
   // ---- images (canvas + toBlob; no WebCodecs/MP4 needed) -----------------
@@ -326,67 +355,110 @@
     }
     // Lossless → max quality (1.0); PNG ignores it and stays truly lossless.
     const baseQ = cfg.lossless ? 1 : (cfg.quality || 85) / 100;
-    async function fit(canvas, target) {
-      if (!lossy || !target) return await toBlob(canvas, baseQ);
-      let lo = 1, hi = 100, best = null;
+    /**
+     * Highest-quality blob that fits `target`, plus the quality it used.
+     * Tries the ceiling first so an image that already fits costs one encode
+     * instead of a full binary search; `minQ` lets a downscale round start from
+     * the quality the previous round reached.
+     */
+    async function fit(canvas, target, minQ) {
+      if (!lossy || !target) return { blob: await toBlob(canvas, baseQ), quality: 100 };
+      const ceiling = await toBlob(canvas, 1);
+      if (ceiling && ceiling.size <= target) return { blob: ceiling, quality: 100 };
+      let lo = minQ, hi = 99, best = null, bestQ = minQ;
       while (lo <= hi) {
         const q = Math.floor((lo + hi) / 2);
         const b = await toBlob(canvas, q / 100);
-        if (b && b.size <= target) { best = b; lo = q + 1; } else { hi = q - 1; }
+        if (b && b.size <= target) { best = b; bestQ = q; lo = q + 1; } else { hi = q - 1; }
       }
-      return best || await toBlob(canvas, 0.01);
+      return { blob: best || await toBlob(canvas, minQ / 100), quality: bestQ };
     }
 
     // A target size can't be honored losslessly — ignore it in that case.
     const target = cfg.lossless || !cfg.targetSizeKB ? null : cfg.targetSizeKB * 1024;
-    let [w, h] = fitDims(bmp.width, bmp.height);
-    let canvas = draw(w, h);
-    let out = await fit(canvas, target);
-    let tries = 0;
-    while (target && out && out.size > target && tries < 5 && canvas.width > 32) {
-      w = Math.round(canvas.width * 0.75); h = Math.round(canvas.height * 0.75);
-      canvas = draw(w, h);
-      out = await fit(canvas, target);
-      tries++;
-    }
-    if (!out) { bmp.close(); throw new Error('image encode failed'); }
+    try {
+      let [w, h] = fitDims(bmp.width, bmp.height);
+      let canvas = draw(w, h);
+      let fitted = await fit(canvas, target, 1);
+      let tries = 0;
+      while (target && fitted.blob && fitted.blob.size > target && tries < 5 &&
+             canvas.width > 32) {
+        w = Math.round(canvas.width * 0.75); h = Math.round(canvas.height * 0.75);
+        canvas = draw(w, h);
+        // A smaller image fits at least the quality the last round reached.
+        fitted = await fit(canvas, target, fitted.quality);
+        tries++;
+      }
+      const out = fitted.blob;
+      if (!out) throw new Error('image encode failed');
 
-    // Re-encoding can end up larger than the source (already-compressed input,
-    // or lossless). If so, hand back the untouched original.
-    const keepOriginal = cfg.keepOriginalIfLarger !== false;
-    if (keepOriginal && out.size >= blob.size) {
-      const srcFmt = blob.type ? blob.type.replace('image/', '') : fmt;
-      const dims = [bmp.width, bmp.height];
-      bmp.close();
+      // Re-encoding can end up larger than the source (already-compressed input,
+      // or lossless). If so, hand back the untouched original.
+      const keepOriginal = cfg.keepOriginalIfLarger !== false;
+      if (keepOriginal && out.size >= blob.size) {
+        return {
+          outputPath: url,
+          originalSizeBytes: blob.size,
+          compressedSizeBytes: blob.size,
+          width: bmp.width, height: bmp.height,
+          format: blob.type ? blob.type.replace('image/', '') : fmt,
+          skipped: true,
+        };
+      }
+      // toBlob silently falls back to PNG when the browser can't encode the
+      // requested type (WebP on older Safari), so report what was written.
+      const actual = out.type ? out.type.replace('image/', '') : fmt;
       return {
-        outputPath: url,
+        outputPath: trackUrl(URL.createObjectURL(out)),
         originalSizeBytes: blob.size,
-        compressedSizeBytes: blob.size,
-        width: dims[0], height: dims[1], format: srcFmt, skipped: true,
+        compressedSizeBytes: out.size,
+        width: canvas.width, height: canvas.height, format: actual, skipped: false,
       };
+    } finally {
+      bmp.close();
     }
-    bmp.close();
-    return {
-      outputPath: URL.createObjectURL(out),
-      originalSizeBytes: blob.size,
-      compressedSizeBytes: out.size,
-      width: canvas.width, height: canvas.height, format: fmt, skipped: false,
-    };
   };
 
   // ---- download / cleanup ------------------------------------------------
 
-  NS.download = function (url, fileName) {
+  const EXT_BY_MIME = {
+    'video/mp4': 'mp4', 'video/quicktime': 'mov', 'video/webm': 'webm',
+    'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp',
+    'image/heic': 'heic', 'image/heif': 'heic',
+  };
+
+  // Derive a sensible name from the blob's own MIME type. Defaulting to .mp4
+  // would label a compressed JPEG as a movie.
+  async function defaultName(url) {
+    let ext = 'bin';
+    try {
+      const type = (await (await fetch(url)).blob()).type;
+      ext = EXT_BY_MIME[type] || (type.split('/')[1] || 'bin');
+    } catch (_) {}
+    return 'compressed_' + Date.now() + '.' + ext;
+  }
+
+  NS.download = async function (url, fileName) {
+    const name = fileName || (await defaultName(url));
     const a = document.createElement('a');
     a.href = url;
-    a.download = fileName || 'compressed.mp4';
+    a.download = name;
     document.body.appendChild(a);
     a.click();
     a.remove();
-    return fileName || 'compressed.mp4';
+    return name;
   };
 
   NS.revoke = function (url) {
     try { URL.revokeObjectURL(url); } catch (_) {}
+    OUTPUT_URLS.delete(url);
+  };
+
+  /** Revoke every output this engine created (backs Dart's `clearCache`). */
+  NS.revokeAll = function () {
+    for (const url of OUTPUT_URLS) {
+      try { URL.revokeObjectURL(url); } catch (_) {}
+    }
+    OUTPUT_URLS.clear();
   };
 })();

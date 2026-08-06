@@ -28,7 +28,13 @@ external JSPromise<JSObject> _jsCompress(
 external void _jsCancel(String id);
 
 @JS('flutterCompressWeb.download')
-external String _jsDownload(String url, String fileName);
+external JSPromise<JSString> _jsDownload(String url, String? fileName);
+
+@JS('flutterCompressWeb.revoke')
+external void _jsRevoke(String url);
+
+@JS('flutterCompressWeb.revokeAll')
+external void _jsRevokeAll();
 
 @JS('flutterCompressWeb.getImageInfo')
 external JSPromise<JSObject> _jsGetImageInfo(String url);
@@ -142,7 +148,9 @@ class FlutterCompressWeb extends FlutterCompressPlatform {
       final m = await _rawInfo(path);
       final srcW = (m['width'] as num).toInt();
       final srcH = (m['height'] as num).toInt();
-      final durationMs = (m['durationMs'] as num).toInt();
+      // Use the same duration `estimate` does, so the two agree. (Web doesn't
+      // apply the trim window yet, but the bitrate budget must still match.)
+      final durationMs = _clampDuration((m['durationMs'] as num).toInt(), config);
       final srcKbps = (m['bitrateKbps'] as num).toInt();
       final srcBytes = (m['sizeBytes'] as num).toInt();
       final (tw, th) = _SizeMath.targetDimensions(srcW, srcH, config);
@@ -220,13 +228,25 @@ class FlutterCompressWeb extends FlutterCompressPlatform {
 
   @override
   Future<void> clearCache() async {
-    // Output blob URLs are owned by the caller on web; nothing global to clear.
+    // Outputs are blob: URLs, which the browser keeps alive for the whole page
+    // unless revoked. Release every URL this engine handed out.
+    await _ensureImageLoaded();
+    _jsRevokeAll();
+  }
+
+  @override
+  Future<void> releaseOutput(String path) async {
+    await _ensureImageLoaded();
+    _jsRevoke(path);
   }
 
   @override
   Future<String> saveToDownloads(String path, String? fileName) async {
     await _ensureImageLoaded(); // only needs the engine's download() helper
-    return _jsDownload(path, fileName ?? 'compressed.mp4');
+    // Never default to .mp4 — this method is shared with the image API, and a
+    // JPEG saved as "compressed.mp4" is worse than a generic name. The JS side
+    // derives the extension from the blob's MIME type when we pass null.
+    return (await _jsDownload(path, fileName).toDart).toDart;
   }
 
   // ---- images ------------------------------------------------------------

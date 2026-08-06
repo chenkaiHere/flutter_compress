@@ -7,11 +7,13 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
+import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Bridges Flutter <-> the native pieces: [CompressionEngine] (transcode),
@@ -68,7 +70,8 @@ class FlutterCompressPlugin :
             "estimate" ->
                 dispatch(result, "estimate_failed") { eng.estimate(call.str("path"), call.config()) }
 
-            "compress" -> dispatch(result, "compress_failed") {
+            // Media3's Transformer must be created and driven from a Looper thread.
+            "compress" -> dispatch(result, "compress_failed", Dispatchers.Main.immediate) {
                 eng.compress(
                     call.str("id"), call.str("path"), call.config(),
                     call.argument<String>("outputDir"),
@@ -96,7 +99,7 @@ class FlutterCompressPlugin :
                 result.success(null)
             }
 
-            "saveToDownloads" -> dispatch(result, "save_failed") {
+            "saveToDownloads" -> dispatch(result, "save_failed", Dispatchers.IO) {
                 DownloadSaver.save(context, call.str("path"), call.argument<String>("fileName"))
             }
 
@@ -118,10 +121,22 @@ class FlutterCompressPlugin :
         }
     }
 
-    /** Run [block] off the main call, forwarding its value or a typed error. */
-    private fun dispatch(result: Result, errorCode: String, block: suspend () -> Any?) {
+    /**
+     * Run [block] on [ctx], then deliver its value (or a typed error) on the
+     * main thread, as `MethodChannel.Result` requires.
+     *
+     * Defaults to a background dispatcher: only Media3's `Transformer` needs the
+     * main looper, and everything else here (image encode, probes, thumbnails,
+     * MediaStore copies) is blocking CPU/IO work that would otherwise ANR.
+     */
+    private fun dispatch(
+        result: Result,
+        errorCode: String,
+        ctx: CoroutineContext = Dispatchers.Default,
+        block: suspend () -> Any?,
+    ) {
         scope.launch {
-            runCatching { block() }
+            runCatching { withContext(ctx) { block() } }
                 .onSuccess { result.success(it) }
                 .onFailure { e ->
                     if (e is CompressionCancelledException) result.error("cancelled", e.message, null)

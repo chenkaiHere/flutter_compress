@@ -36,21 +36,35 @@ public class FlutterCompressPlugin: NSObject, FlutterPlugin, FlutterStreamHandle
 
   public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
     let a = call.arguments as? [String: Any] ?? [:]
-    func str(_ k: String) -> String { a[k] as! String }
+    // Throwing (rather than force-unwrapping) keeps a malformed call from
+    // crashing the host app — it surfaces as a FlutterError instead.
+    func str(_ k: String) throws -> String {
+      guard let v = a[k] as? String else { throw Self.badArg(k) }
+      return v
+    }
+    func map(_ k: String) throws -> [String: Any] {
+      guard let v = a[k] as? [String: Any] else { throw Self.badArg(k) }
+      return v
+    }
 
     switch call.method {
     case "getVideoInfo":
-      dispatch(result, "info_failed") { try MediaProbe.videoInfo(path: str("path")) }
+      dispatch(result, "info_failed") { try MediaProbe.videoInfo(path: try str("path")) }
 
     case "estimate":
       dispatch(result, "estimate_failed") {
         try self.engine.estimate(
-          path: str("path"), config: CompressionConfig(map: a["config"] as! [String: Any]))
+          path: try str("path"), config: CompressionConfig(map: try map("config")))
       }
 
     case "compress":
-      let config = CompressionConfig(map: a["config"] as! [String: Any])
-      let id = str("id"), path = str("path")
+      guard let config = try? CompressionConfig(map: map("config")),
+        let id = try? str("id"), let path = try? str("path")
+      else {
+        result(
+          FlutterError(code: "bad_arguments", message: "compress: missing id/path/config", details: nil))
+        return
+      }
       let outputDir = a["outputDir"] as? String, outputName = a["outputName"] as? String
       workQueue.async {
         self.engine.compress(
@@ -76,7 +90,7 @@ public class FlutterCompressPlugin: NSObject, FlutterPlugin, FlutterStreamHandle
     case "getThumbnail":
       dispatch(result, "thumbnail_failed") {
         try Thumbnailer.generate(
-          dir: PluginFiles.cacheDir(), path: str("path"),
+          dir: PluginFiles.cacheDir(), path: try str("path"),
           positionMs: (a["positionMs"] as? NSNumber)?.int64Value ?? 0,
           quality: (a["quality"] as? NSNumber)?.intValue ?? 80,
           maxWidth: (a["maxWidth"] as? NSNumber)?.intValue)
@@ -88,18 +102,18 @@ public class FlutterCompressPlugin: NSObject, FlutterPlugin, FlutterStreamHandle
 
     case "saveToDownloads":
       dispatch(result, "save_failed") {
-        try DownloadSaver.save(path: str("path"), fileName: a["fileName"] as? String)
+        try DownloadSaver.save(path: try str("path"), fileName: a["fileName"] as? String)
       }
 
     // ---- images ----
     case "getImageInfo":
-      dispatch(result, "image_info_failed") { try ImageEngine.info(path: str("path")) }
+      dispatch(result, "image_info_failed") { try ImageEngine.info(path: try str("path")) }
 
     case "compressImage":
       dispatch(result, "image_compress_failed") {
         try ImageEngine.compress(
-          path: str("path"),
-          config: ImageConfig(map: a["config"] as! [String: Any]),
+          path: try str("path"),
+          config: ImageConfig(map: try map("config")),
           outputDir: a["outputDir"] as? String,
           outputName: a["outputName"] as? String)
       }
@@ -119,5 +133,11 @@ public class FlutterCompressPlugin: NSObject, FlutterPlugin, FlutterStreamHandle
         result(FlutterError(code: errorCode, message: error.localizedDescription, details: nil))
       }
     }
+  }
+
+  private static func badArg(_ key: String) -> NSError {
+    NSError(
+      domain: "flutter_compress", code: 1,
+      userInfo: [NSLocalizedDescriptionKey: "Missing or invalid argument: \(key)"])
   }
 }

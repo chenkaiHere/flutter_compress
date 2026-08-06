@@ -4,12 +4,13 @@
 #
 Pod::Spec.new do |s|
   s.name             = 'flutter_compress'
-  s.version          = '0.1.0'
-  s.summary          = 'High-quality Flutter video compression with precise target-size/bitrate control.'
+  s.version          = '1.1.2'
+  s.summary          = 'High-quality Flutter video & image compression with precise target-size control.'
   s.description      = <<-DESC
 Video compression via an explicit AVAssetReader/Writer pipeline (not export presets),
 enabling precise target-size and bitrate control, HEVC with H.264 fallback, live
-progress and cancellation.
+progress and cancellation. Image compression via ImageIO with target-size, quality
+and lossless modes.
                        DESC
   s.homepage         = 'https://github.com/chenkaiHere/flutter_compress'
   s.license          = { :file => '../LICENSE' }

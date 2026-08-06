@@ -34,11 +34,18 @@ object DownloadSaver {
         }
         val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, pending)
             ?: error("Could not create Downloads entry")
-        resolver.openOutputStream(uri)?.use { out -> src.inputStream().use { it.copyTo(out) } }
-            ?: error("Could not open output stream")
-        resolver.update(
-            uri, ContentValues().apply { put(MediaStore.Downloads.IS_PENDING, 0) }, null, null,
-        )
+        try {
+            resolver.openOutputStream(uri)?.use { out -> src.inputStream().use { it.copyTo(out) } }
+                ?: error("Could not open output stream")
+            resolver.update(
+                uri, ContentValues().apply { put(MediaStore.Downloads.IS_PENDING, 0) }, null, null,
+            )
+        } catch (e: Throwable) {
+            // An entry left IS_PENDING is invisible to the user but still holds
+            // disk; drop it rather than leaking an orphan.
+            runCatching { resolver.delete(uri, null, null) }
+            throw e
+        }
         return uri.toString()
     }
 

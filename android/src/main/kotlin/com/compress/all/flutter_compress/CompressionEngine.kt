@@ -81,7 +81,14 @@ class CompressionEngine(
         // mp4 regardless of the requested container.
         val outFile = context.resolveOutput(outputDir, outputName, path, "mp4")
 
-        runTransformer(id, buildEditedItem(path, config, tw, th), outFile, videoMime, videoBps)
+        try {
+            runTransformer(id, buildEditedItem(path, config, tw, th), outFile, videoMime, videoBps)
+        } catch (e: Throwable) {
+            // Cancellation and export errors both leave a partially muxed file
+            // behind; don't let it accumulate in the cache.
+            outFile.delete()
+            throw e
+        }
 
         val compressedSize = outFile.length()
         val skipped = config.keepOriginalIfLarger && compressedSize >= originalSize

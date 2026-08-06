@@ -64,6 +64,10 @@ abstract class FlutterCompressPlatform extends PlatformInterface {
   Future<void> clearCache() =>
       throw UnimplementedError('clearCache() has not been implemented.');
 
+  /// Release a single output. No-op on native (files live until [clearCache]);
+  /// on web it revokes the blob: URL so the browser can free the bytes.
+  Future<void> releaseOutput(String path) async {}
+
   Future<String> saveToDownloads(String path, String? fileName) =>
       throw UnimplementedError('saveToDownloads() has not been implemented.');
 

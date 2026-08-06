@@ -24,7 +24,11 @@ internal fun Context.resolveOutput(
     sourcePath: String,
     ext: String,
 ): File {
-    val base = outputName?.substringAfterLast('/')?.substringAfterLast('\\')
+    val base = outputName
+        ?.substringAfterLast('/')?.substringAfterLast('\\')
+        // Drop any extension the caller supplied — [ext] is authoritative, so
+        // "photo.jpg" must not become "photo.jpg.jpg".
+        ?.substringBeforeLast('.')
         ?.takeIf { it.isNotBlank() }
         ?: "${File(sourcePath).nameWithoutExtension}_${System.currentTimeMillis()}"
     val fileName = "$base.$ext"

@@ -8,6 +8,9 @@ import UIKit
 /// target-size compression possible on iOS.
 final class CompressionEngine {
 
+  /// Minimum gap between progress events, matching Android's 250ms polling.
+  fileprivate static let progressIntervalSec: TimeInterval = 0.25
+
   var onProgress: (([String: Any]) -> Void)?
 
   private let lock = NSLock()
@@ -202,31 +205,40 @@ final class CompressionEngine {
       let durationSec = max(CMTimeGetSeconds(dur), 0.001)
       let startSec = CMTimeGetSeconds(startTime)
 
-      // Video pump.
+      // Video pump. Progress is throttled: emitting per frame would mean a file
+      // stat + a main-thread hop + a platform-channel message ~1800 times for a
+      // 60s/30fps clip, starving the UI. (Android polls every 250ms.)
+      var lastEmit = Date.distantPast
       group.enter()
       videoWriterInput.requestMediaDataWhenReady(on: videoQueue) {
-        while videoWriterInput.isReadyForMoreMediaData {
-          if self.isCancelled() {
-            videoWriterInput.markAsFinished()
-            group.leave()
-            return
-          }
-          if let sample = videoReaderOutput.copyNextSampleBuffer() {
-            let pts = CMTimeGetSeconds(CMSampleBufferGetPresentationTimeStamp(sample))
-            let progress = min(max((pts - startSec) / durationSec, 0), 1)
-            let outBytes = (try? FileManager.default.attributesOfItem(
-              atPath: outURL.path)[.size] as? Int64) ?? 0
-            self.onProgress?([
-              "id": id,
-              "progress": progress,
-              "estimatedRemainingMs": NSNull(),
-              "currentOutputBytes": outBytes,
-            ])
+        autoreleasepool {
+          while videoWriterInput.isReadyForMoreMediaData {
+            if self.isCancelled() {
+              videoWriterInput.markAsFinished()
+              group.leave()
+              return
+            }
+            guard let sample = videoReaderOutput.copyNextSampleBuffer() else {
+              videoWriterInput.markAsFinished()
+              group.leave()
+              return
+            }
+            let now = Date()
+            if now.timeIntervalSince(lastEmit) >= Self.progressIntervalSec {
+              lastEmit = now
+              let pts = CMTimeGetSeconds(CMSampleBufferGetPresentationTimeStamp(sample))
+              let progress = min(max((pts - startSec) / durationSec, 0), 1)
+              let outBytes =
+                (try? FileManager.default.attributesOfItem(atPath: outURL.path)[.size] as? Int64)
+                ?? 0
+              self.onProgress?([
+                "id": id,
+                "progress": progress,
+                "estimatedRemainingMs": NSNull(),
+                "currentOutputBytes": outBytes,
+              ])
+            }
             videoWriterInput.append(sample)
-          } else {
-            videoWriterInput.markAsFinished()
-            group.leave()
-            return
           }
         }
       }
@@ -261,6 +273,10 @@ final class CompressionEngine {
           return
         }
         if reader.status == .failed {
+          // Abandoning a writing AVAssetWriter leaks its encode session and
+          // leaves a half-written file in the cache.
+          writer.cancelWriting()
+          try? FileManager.default.removeItem(at: outURL)
           finish(.failure(reader.error?.localizedDescription ?? "Reader failed"))
           return
         }
@@ -285,6 +301,7 @@ final class CompressionEngine {
               ]))
             }
           } else {
+            try? FileManager.default.removeItem(at: outURL)
             finish(.failure(writer.error?.localizedDescription ?? "Writer failed"))
           }
         }

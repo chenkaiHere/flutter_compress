@@ -144,8 +144,18 @@ class FlutterCompress {
         maxWidth: maxWidth,
       );
 
-  /// Delete temporary files this plugin produced.
+  /// Delete temporary files this plugin produced. On web this revokes every
+  /// output blob: URL the engine handed out.
   Future<void> clearCache() => _platform.clearCache();
+
+  /// Release a single output once you're done with it.
+  ///
+  /// On Android/iOS this is a no-op (files live until [clearCache]). On **web**
+  /// it revokes the output's blob: URL — without it the browser holds the whole
+  /// encoded file in memory for the lifetime of the page, so call it after you
+  /// have downloaded or uploaded the result.
+  Future<void> releaseOutput(String outputPath) =>
+      _platform.releaseOutput(outputPath);
 
   // ==== Images ============================================================
   // A separate API surface from the video methods above; they never mix.

@@ -87,7 +87,7 @@
 
 ```yaml
 dependencies:
-  flutter_compress: ^1.1.0
+  flutter_compress: ^1.1.2
 ```
 
 ## 快速上手
@@ -154,6 +154,7 @@ await token.cancel();                      // 中止上面的任务
 await api.compressAll(paths, config);
 final String thumb = await api.getThumbnail(path, positionMs: 1000, maxWidth: 320);
 final String saved = await api.saveToDownloads(result.outputPath);
+await api.releaseOutput(result.outputPath);  // 释放单个结果(见下)
 await api.clearCache();
 
 // 全局进度流(适合批量 UI)
@@ -212,8 +213,10 @@ await api.compressImages(paths, const ImageCompressConfig(targetSizeKB: 300));
   `UIFileSharingEnabled` 与 `LSSupportsOpeningDocumentsInPlace`。
 - **Web** —— 需要 WebCodecs(Chrome/Edge 94+、Safari 16.4+)。输入/输出均为
   `blob:` URL;内置的解封装/封装 JS(约 0.2MB)首次使用时懒加载。用 `file_picker`
-  选文件并传 `xFile.path`(在 web 上就是 `blob:` URL)。可直接在
-  [在线 Demo](https://flutter-compress.ckdgdgdg.workers.dev/) 里试用。
+  选文件并传 `xFile.path`(在 web 上就是 `blob:` URL)。
+  结果下载或上传完后请**调用 `releaseOutput(result.outputPath)`** —— 否则浏览器会把
+  整个编码结果在页面生命周期内一直留在内存里(`clearCache()` 可一次性释放全部)。
+  可直接在 [在线 Demo](https://flutter-compress.ckdgdgdg.workers.dev/) 里试用。
 
 ## 已知限制
 
