@@ -1,28 +1,48 @@
 import 'dart:async';
 
 import 'flutter_compress_platform_interface.dart';
+import 'src/exceptions.dart';
 import 'src/image_models.dart';
 import 'src/models.dart';
 
+export 'src/exceptions.dart';
 export 'src/image_models.dart';
 export 'src/models.dart';
 
-/// A cancellation handle for a single compression job.
+/// A cancellation handle for one or more compression jobs.
 ///
-/// Pass one to [FlutterCompress.compress]; call [cancel] to abort. Cancelling
-/// makes the in-flight `compress` future complete with a
-/// [VideoCompressCancelledException].
+/// Pass one to [FlutterCompress.compress], [FlutterCompress.compressAll] or
+/// [FlutterCompress.compressImages]; call [cancel] to abort. Cancelling makes
+/// the in-flight future complete with a [VideoCompressCancelledException] (or
+/// [ImageCompressCancelledException] for images) — catch [CompressCancelled] to
+/// handle either.
+///
+/// A token latches: once cancelled it stays cancelled, and reusing it would
+/// abort the next job immediately. Either create a fresh token per run or call
+/// [reset] between runs.
 class CancellationToken {
   bool _cancelled = false;
-  String? _id;
+
+  /// Every job this token is bound to. A token handed to several concurrent
+  /// jobs cancels all of them, not just the most recent.
+  final Set<String> _ids = <String>{};
+
   bool get isCancelled => _cancelled;
 
-  void _bind(String id) => _id = id;
+  void _bind(String id) => _ids.add(id);
+
+  void _unbind(String id) => _ids.remove(id);
+
+  /// Make this token usable again for a new job.
+  void reset() {
+    _cancelled = false;
+    _ids.clear();
+  }
 
   Future<void> cancel() async {
     _cancelled = true;
-    if (_id != null) {
-      await FlutterCompress.instance.cancel(_id);
+    for (final id in _ids.toList()) {
+      await FlutterCompress.instance.cancel(id);
     }
   }
 }
@@ -95,6 +115,7 @@ class FlutterCompress {
           id, path, config, outputDirectory, outputName);
     } finally {
       await sub?.cancel();
+      cancellationToken?._unbind(id);
     }
   }
 
@@ -102,31 +123,52 @@ class FlutterCompress {
   ///
   /// [onItemProgress] carries the item index alongside its progress so a batch
   /// UI can render one bar per file.
+  ///
+  /// With [continueOnError] a failing video doesn't abort the batch: it is
+  /// reported to [onItemError] and omitted from the result, so the returned list
+  /// may be shorter than [paths]. Without it the first failure throws and the
+  /// already-encoded results are lost.
   Future<List<VideoCompressResult>> compressAll(
     List<String> paths,
     VideoCompressConfig config, {
     void Function(int index, CompressionProgress)? onItemProgress,
     CancellationToken? cancellationToken,
     String? outputDirectory,
+    bool continueOnError = false,
+    void Function(int index, String path, Object error)? onItemError,
   }) async {
     final results = <VideoCompressResult>[];
     for (var i = 0; i < paths.length; i++) {
       if (cancellationToken?.isCancelled ?? false) {
         throw VideoCompressCancelledException();
       }
-      results.add(await compress(
-        paths[i],
-        config,
-        onProgress: onItemProgress == null ? null : (p) => onItemProgress(i, p),
-        cancellationToken: cancellationToken,
-        outputDirectory: outputDirectory,
-      ));
+      try {
+        results.add(await compress(
+          paths[i],
+          config,
+          onProgress:
+              onItemProgress == null ? null : (p) => onItemProgress(i, p),
+          cancellationToken: cancellationToken,
+          outputDirectory: outputDirectory,
+        ));
+      } catch (e) {
+        // A cancel is for the whole batch, never just this item.
+        if (!continueOnError || e is CompressCancelled) rethrow;
+        onItemError?.call(i, paths[i], e);
+      }
     }
     return results;
   }
 
-  /// Cancel a specific job by [id], or all jobs when [id] is null.
+  /// Cancel one job by [id] — or, when [id] is omitted, **every** job.
+  ///
+  /// Prefer a [CancellationToken] (it tracks its own job ids) or the explicit
+  /// [cancelAll]; the bare `cancel()` form is easy to write by accident when you
+  /// meant to stop a single job.
   Future<void> cancel([String? id]) => _platform.cancel(id);
+
+  /// Cancel every in-flight job. Same as `cancel()` with no id, but says so.
+  Future<void> cancelAll() => _platform.cancel(null);
 
   Future<bool> isCompressing() => _platform.isCompressing();
 
@@ -212,14 +254,43 @@ class FlutterCompress {
 
   /// Compress a list of images sequentially. Each output is auto-named from its
   /// own source (base name + timestamp).
+  ///
+  /// [onItemDone] fires after each image with its 0-based index and the running
+  /// total — images encode in milliseconds, so per-item is the useful
+  /// granularity for a batch progress bar.
+  ///
+  /// [cancellationToken] stops the run between items, throwing
+  /// [ImageCompressCancelledException]; images already finished are lost, so
+  /// prefer [continueOnError] + [onItemDone] if you need to keep partial work.
+  ///
+  /// With [continueOnError] a failing image doesn't abort the batch: it is
+  /// reported to [onItemError] and simply omitted from the result, so the
+  /// returned list may be shorter than [paths].
   Future<List<ImageCompressResult>> compressImages(
     List<String> paths,
     ImageCompressConfig config, {
     String? outputDirectory,
+    void Function(int index, int total)? onItemDone,
+    CancellationToken? cancellationToken,
+    bool continueOnError = false,
+    void Function(int index, String path, Object error)? onItemError,
   }) async {
     final out = <ImageCompressResult>[];
-    for (final p in paths) {
-      out.add(await compressImage(p, config, outputDirectory: outputDirectory));
+    for (var i = 0; i < paths.length; i++) {
+      if (cancellationToken?.isCancelled ?? false) {
+        throw ImageCompressCancelledException();
+      }
+      try {
+        out.add(await compressImage(
+          paths[i],
+          config,
+          outputDirectory: outputDirectory,
+        ));
+      } catch (e) {
+        if (!continueOnError) rethrow;
+        onItemError?.call(i, paths[i], e);
+      }
+      onItemDone?.call(i, paths.length);
     }
     return out;
   }

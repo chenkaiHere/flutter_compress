@@ -5,6 +5,7 @@ import 'package:flutter_web_plugins/flutter_web_plugins.dart';
 import 'package:web/web.dart' as web;
 
 import 'flutter_compress_platform_interface.dart';
+import 'src/exceptions.dart';
 import 'src/image_models.dart';
 import 'src/models.dart';
 
@@ -254,8 +255,12 @@ class FlutterCompressWeb extends FlutterCompressPlatform {
   @override
   Future<ImageMeta> getImageInfo(String path) async {
     await _ensureImageLoaded();
-    final m = (await _jsGetImageInfo(path).toDart).dartify() as Map;
-    return ImageMeta.fromMap(m.cast<dynamic, dynamic>());
+    try {
+      final m = (await _jsGetImageInfo(path).toDart).dartify() as Map;
+      return ImageMeta.fromMap(m.cast<dynamic, dynamic>());
+    } catch (e) {
+      throw ImageCompressException('image_info_failed', e.toString());
+    }
   }
 
   @override
@@ -268,9 +273,13 @@ class FlutterCompressWeb extends FlutterCompressPlatform {
     // Web output is a blob: URL; outputDir/outputName don't apply. A null
     // config.format tells the JS engine to keep the source's format.
     await _ensureImageLoaded();
-    final cfg = config.toMap().jsify()! as JSObject;
-    final res = (await _jsCompressImage(path, cfg).toDart).dartify() as Map;
-    return ImageCompressResult.fromMap(res.cast<dynamic, dynamic>());
+    try {
+      final cfg = config.toMap().jsify()! as JSObject;
+      final res = (await _jsCompressImage(path, cfg).toDart).dartify() as Map;
+      return ImageCompressResult.fromMap(res.cast<dynamic, dynamic>());
+    } catch (e) {
+      throw ImageCompressException('image_compress_failed', e.toString());
+    }
   }
 
   int _clampDuration(int full, VideoCompressConfig c) {

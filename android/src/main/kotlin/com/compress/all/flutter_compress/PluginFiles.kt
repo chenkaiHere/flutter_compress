@@ -32,9 +32,16 @@ internal fun Context.resolveOutput(
         ?.takeIf { it.isNotBlank() }
         ?: "${File(sourcePath).nameWithoutExtension}_${System.currentTimeMillis()}"
     val fileName = "$base.$ext"
-    if (outputDir != null && outputDir.startsWith("/")) {
+    val target = if (outputDir != null && outputDir.startsWith("/")) {
         val dir = File(outputDir).also { it.mkdirs() }
-        if (dir.canWrite()) return File(dir, fileName)
+        if (dir.canWrite()) File(dir, fileName) else File(compressCacheDir(), fileName)
+    } else {
+        File(compressCacheDir(), fileName)
     }
-    return File(compressCacheDir(), fileName)
+    // Never write over the input: the engines still read the source afterwards
+    // (EXIF copy, size comparison), and clobbering it in place loses the original.
+    if (target.absolutePath == File(sourcePath).absolutePath) {
+        return File(target.parentFile, "$base-1.$ext")
+    }
+    return target
 }

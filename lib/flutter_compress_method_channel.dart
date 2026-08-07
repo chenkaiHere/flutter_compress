@@ -1,6 +1,7 @@
 import 'package:flutter/services.dart';
 
 import 'flutter_compress_platform_interface.dart';
+import 'src/exceptions.dart';
 import 'src/image_models.dart';
 import 'src/models.dart';
 
@@ -26,26 +27,43 @@ class MethodChannelFlutterCompress extends FlutterCompressPlatform {
     return _progressStream!;
   }
 
-  @override
-  Future<VideoInfo> getVideoInfo(String path) async {
-    final res = await _method.invokeMethod<Map<dynamic, dynamic>>(
-      'getVideoInfo',
-      {'path': path},
-    );
-    return VideoInfo.fromMap(res!);
+  /// Invoke [method] and map any platform failure onto a typed exception, so a
+  /// raw [PlatformException] never reaches the caller. [wrap] decides whether
+  /// this is a video or an image error; `cancelled` always wins.
+  Future<T> _invoke<T>(
+    String method,
+    Map<String, dynamic> args,
+    CompressException Function(String code, String? message) wrap,
+  ) async {
+    try {
+      final res = await _method.invokeMethod<T>(method, args);
+      if (res == null) {
+        throw wrap('${method}_failed', '$method returned no result');
+      }
+      return res;
+    } on PlatformException catch (e) {
+      if (e.code == 'cancelled') throw VideoCompressCancelledException(e.message);
+      throw wrap(e.code, e.message);
+    }
   }
+
+  Future<Map<dynamic, dynamic>> _invokeVideoMap(
+          String method, Map<String, dynamic> args) =>
+      _invoke<Map<dynamic, dynamic>>(method, args, VideoCompressException.new);
+
+  @override
+  Future<VideoInfo> getVideoInfo(String path) async =>
+      VideoInfo.fromMap(await _invokeVideoMap('getVideoInfo', {'path': path}));
 
   @override
   Future<CompressionEstimate> estimate(
     String path,
     VideoCompressConfig config,
-  ) async {
-    final res = await _method.invokeMethod<Map<dynamic, dynamic>>(
-      'estimate',
-      {'path': path, 'config': config.toMap()},
-    );
-    return CompressionEstimate.fromMap(res!);
-  }
+  ) async =>
+      CompressionEstimate.fromMap(await _invokeVideoMap(
+        'estimate',
+        {'path': path, 'config': config.toMap()},
+      ));
 
   @override
   Future<VideoCompressResult> compress(
@@ -54,26 +72,14 @@ class MethodChannelFlutterCompress extends FlutterCompressPlatform {
     VideoCompressConfig config,
     String? outputDir,
     String? outputName,
-  ) async {
-    try {
-      final res = await _method.invokeMethod<Map<dynamic, dynamic>>(
-        'compress',
-        {
-          'id': id,
-          'path': path,
-          'config': config.toMap(),
-          'outputDir': outputDir,
-          'outputName': outputName,
-        },
-      );
-      return VideoCompressResult.fromMap(res!);
-    } on PlatformException catch (e) {
-      if (e.code == 'cancelled') {
-        throw VideoCompressCancelledException(e.message);
-      }
-      throw VideoCompressException(e.code, e.message);
-    }
-  }
+  ) async =>
+      VideoCompressResult.fromMap(await _invokeVideoMap('compress', {
+        'id': id,
+        'path': path,
+        'config': config.toMap(),
+        'outputDir': outputDir,
+        'outputName': outputName,
+      }));
 
   @override
   Future<void> cancel(String? id) =>
@@ -89,36 +95,38 @@ class MethodChannelFlutterCompress extends FlutterCompressPlatform {
     required int positionMs,
     required int quality,
     int? maxWidth,
-  }) async {
-    final res = await _method.invokeMethod<String>('getThumbnail', {
-      'path': path,
-      'positionMs': positionMs,
-      'quality': quality,
-      'maxWidth': maxWidth,
-    });
-    return res!;
-  }
+  }) =>
+      _invoke<String>(
+        'getThumbnail',
+        {
+          'path': path,
+          'positionMs': positionMs,
+          'quality': quality,
+          'maxWidth': maxWidth,
+        },
+        VideoCompressException.new,
+      );
 
   @override
   Future<void> clearCache() => _method.invokeMethod<void>('clearCache');
 
   @override
-  Future<String> saveToDownloads(String path, String? fileName) async {
-    final res = await _method.invokeMethod<String>('saveToDownloads', {
-      'path': path,
-      'fileName': fileName,
-    });
-    return res!;
-  }
+  Future<String> saveToDownloads(String path, String? fileName) => _invoke<String>(
+        'saveToDownloads',
+        {'path': path, 'fileName': fileName},
+        VideoCompressException.new,
+      );
 
   // ---- images ------------------------------------------------------------
 
   @override
-  Future<ImageMeta> getImageInfo(String path) async {
-    final res = await _method
-        .invokeMethod<Map<dynamic, dynamic>>('getImageInfo', {'path': path});
-    return ImageMeta.fromMap(res!);
-  }
+  Future<ImageMeta> getImageInfo(String path) async => ImageMeta.fromMap(
+        await _invoke<Map<dynamic, dynamic>>(
+          'getImageInfo',
+          {'path': path},
+          ImageCompressException.new,
+        ),
+      );
 
   @override
   Future<ImageCompressResult> compressImage(
@@ -126,14 +134,17 @@ class MethodChannelFlutterCompress extends FlutterCompressPlatform {
     ImageCompressConfig config,
     String? outputDir,
     String? outputName,
-  ) async {
-    final res =
-        await _method.invokeMethod<Map<dynamic, dynamic>>('compressImage', {
-      'path': path,
-      'config': config.toMap(),
-      'outputDir': outputDir,
-      'outputName': outputName,
-    });
-    return ImageCompressResult.fromMap(res!);
-  }
+  ) async =>
+      ImageCompressResult.fromMap(
+        await _invoke<Map<dynamic, dynamic>>(
+          'compressImage',
+          {
+            'path': path,
+            'config': config.toMap(),
+            'outputDir': outputDir,
+            'outputName': outputName,
+          },
+          ImageCompressException.new,
+        ),
+      );
 }

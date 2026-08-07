@@ -169,4 +169,55 @@ void main() {
     expect(m.height, 800);
     expect(m.format, 'png');
   });
+
+  // ---- exceptions & tokens ----------------------------------------------
+
+  group('exceptions', () {
+    test('video and image errors share a catchable base', () {
+      expect(VideoCompressException('x', null), isA<CompressException>());
+      expect(ImageCompressException('x', null), isA<CompressException>());
+    });
+
+    test('both cancel types are catchable as CompressCancelled', () {
+      expect(VideoCompressCancelledException(), isA<CompressCancelled>());
+      expect(ImageCompressCancelledException(), isA<CompressCancelled>());
+      expect(VideoCompressCancelledException().code, 'cancelled');
+      expect(ImageCompressCancelledException().code, 'cancelled');
+    });
+
+    test('a plain failure is not mistaken for a cancel', () {
+      expect(ImageCompressException('image_compress_failed', 'boom'),
+          isNot(isA<CompressCancelled>()));
+    });
+  });
+
+  group('CancellationToken', () {
+    test('latches until reset', () async {
+      final token = CancellationToken();
+      expect(token.isCancelled, false);
+      await token.cancel();
+      expect(token.isCancelled, true);
+      // Without reset a reused token would abort the next job immediately.
+      token.reset();
+      expect(token.isCancelled, false);
+    });
+  });
+
+  group('config assertions', () {
+    test('video rejects non-positive sizes', () {
+      expect(() => VideoCompressConfig(targetSizeMB: 0),
+          throwsA(isA<AssertionError>()));
+      expect(() => VideoCompressConfig(maxWidth: 0),
+          throwsA(isA<AssertionError>()));
+      expect(() => VideoCompressConfig(frameRate: 0),
+          throwsA(isA<AssertionError>()));
+    });
+
+    test('image rejects non-positive caps', () {
+      expect(() => ImageCompressConfig(maxWidth: 0),
+          throwsA(isA<AssertionError>()));
+      expect(() => ImageCompressConfig(targetSizeKB: 0),
+          throwsA(isA<AssertionError>()));
+    });
+  });
 }

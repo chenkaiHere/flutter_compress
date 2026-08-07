@@ -87,11 +87,22 @@ class VideoCompressConfig {
     this.alignment = DimensionAlignment.auto16,
     this.keepOriginalIfLarger = true,
     this.container = VideoContainer.auto,
-  }) : assert(
+  })  : assert(
           qualityPercent == null ||
               (qualityPercent >= 1 && qualityPercent <= 100),
           'qualityPercent must be between 1 and 100',
-        );
+        ),
+        // Without these, a zero or negative value silently reaches the native
+        // side and yields a garbage bitrate instead of an error.
+        assert(targetSizeMB == null || targetSizeMB > 0,
+            'targetSizeMB must be > 0'),
+        assert(videoBitrateKbps == null || videoBitrateKbps > 0,
+            'videoBitrateKbps must be > 0'),
+        assert(audioBitrateKbps == null || audioBitrateKbps > 0,
+            'audioBitrateKbps must be > 0'),
+        assert(maxWidth == null || maxWidth > 0, 'maxWidth must be > 0'),
+        assert(maxHeight == null || maxHeight > 0, 'maxHeight must be > 0'),
+        assert(frameRate == null || frameRate > 0, 'frameRate must be > 0');
 
   /// Preset quality tier. Used only when [qualityPercent] is null (and no
   /// higher-priority size control is set).
@@ -291,17 +302,4 @@ class CompressionProgress {
       );
 }
 
-/// Thrown when a compression job fails on the native side.
-class VideoCompressException implements Exception {
-  VideoCompressException(this.code, this.message);
-  final String code;
-  final String? message;
-  @override
-  String toString() => 'VideoCompressException($code): $message';
-}
-
-/// Thrown when a job is cancelled via [FlutterCompress.cancel].
-class VideoCompressCancelledException extends VideoCompressException {
-  VideoCompressCancelledException([String? message])
-      : super('cancelled', message ?? 'Compression was cancelled');
-}
+// Exceptions live in src/exceptions.dart — they're shared with the image API.

@@ -1,11 +1,14 @@
 # Changelog
 
-## 1.1.2
+## 1.2.0
 
+- Fix: cancelling a video on Android left the `compress()` future pending forever.
 - Android: no longer blocks the UI thread; EXIF orientation applied; bitmaps recycled.
 - iOS: failed encodes now error instead of writing a 0-byte file; `maxWidth`/`maxHeight` respected per axis.
 - Web: codecs and output blobs are released; images no longer download as `.mp4`.
-- Add `releaseOutput(path)` to free a single result (web: revokes the blob URL).
+- Typed errors: `CompressException`, `ImageCompressException`, `CompressCancelled`.
+- Batch: `compressImages` gained progress/cancellation; both gained `continueOnError`.
+- Add `releaseOutput(path)`, `cancelAll()`, `CancellationToken.reset()`.
 - Target-size search is far cheaper — one encode when the image already fits.
 
 ## 1.1.1

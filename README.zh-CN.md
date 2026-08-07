@@ -87,7 +87,7 @@
 
 ```yaml
 dependencies:
-  flutter_compress: ^1.1.2
+  flutter_compress: ^1.2.0
 ```
 
 ## 快速上手
@@ -185,11 +185,40 @@ final ImageCompressResult r = await api.compressImage(
 );
 print('${r.format} ${r.width}x${r.height} • 节省 ${r.savedPercent.toStringAsFixed(1)}%');
 
-// 也可转格式、控质量、走无损,或批量:
+// 也可转格式、控质量、走无损:
 await api.compressImage(path, const ImageCompressConfig(format: ImageFormat.webp, quality: 80));
 await api.compressImageLossless(path);   // 保持源格式、像素级
-await api.compressImages(paths, const ImageCompressConfig(targetSizeKB: 300));
+
+// 批量:带进度、可取消、单张失败不影响整体
+final token = CancellationToken();
+final results = await api.compressImages(
+  paths,
+  const ImageCompressConfig(targetSizeKB: 300),
+  onItemDone: (i, total) => print('${i + 1}/$total'),
+  cancellationToken: token,
+  continueOnError: true,                  // 某张失败不丢弃其余结果
+  onItemError: (i, path, e) => print('已跳过 $path: $e'),
+);
 ```
+
+## 错误处理
+
+所有失败都抛类型化异常,不会泄漏原始 `PlatformException`。
+
+```dart
+try {
+  await api.compressImage(path, config);
+} on CompressCancelled {
+  // 被取消(视频/图片通用)
+} on ImageCompressException catch (e) {
+  print('${e.code}: ${e.message}');
+} on CompressException catch (e) {
+  // 两套 API 的其他任何失败
+}
+```
+
+`CompressException` 是基类;`VideoCompressException` / `ImageCompressException` 各自细分,
+`CompressCancelled` 是两种取消异常共同实现的标记接口。
 
 `ImageCompressConfig` —— 优先级为 `lossless` → `targetSizeKB` → `quality`:
 

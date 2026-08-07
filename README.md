@@ -90,7 +90,7 @@ engine falls back to JPEG (the actual format is reported on the result).
 
 ```yaml
 dependencies:
-  flutter_compress: ^1.1.2
+  flutter_compress: ^1.2.0
 ```
 
 ## Quick start
@@ -192,8 +192,37 @@ print('${r.format} ${r.width}x${r.height} • saved ${r.savedPercent.toStringAsF
 // Convert format, control quality, go lossless, or batch:
 await api.compressImage(path, const ImageCompressConfig(format: ImageFormat.webp, quality: 80));
 await api.compressImageLossless(path);   // keep source format, pixel-for-pixel
-await api.compressImages(paths, const ImageCompressConfig(targetSizeKB: 300));
+
+// Batch with progress, cancellation, and per-file error tolerance:
+final token = CancellationToken();
+final results = await api.compressImages(
+  paths,
+  const ImageCompressConfig(targetSizeKB: 300),
+  onItemDone: (i, total) => print('${i + 1}/$total'),
+  cancellationToken: token,
+  continueOnError: true,                  // a bad file won't discard the rest
+  onItemError: (i, path, e) => print('skipped $path: $e'),
+);
 ```
+
+## Errors
+
+Everything throws a typed exception — a raw `PlatformException` never escapes.
+
+```dart
+try {
+  await api.compressImage(path, config);
+} on CompressCancelled {
+  // cancelled (video or image)
+} on ImageCompressException catch (e) {
+  print('${e.code}: ${e.message}');
+} on CompressException catch (e) {
+  // any other failure from either API
+}
+```
+
+`CompressException` is the base; `VideoCompressException` / `ImageCompressException`
+narrow it, and `CompressCancelled` is a marker both cancel types implement.
 
 `ImageCompressConfig` — priority is `lossless` → `targetSizeKB` → `quality`:
 

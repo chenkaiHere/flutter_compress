@@ -21,6 +21,7 @@ import androidx.media3.transformer.VideoEncoderSettings
 import java.io.File
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
+import kotlinx.coroutines.CancellableContinuation
 import kotlinx.coroutines.suspendCancellableCoroutine
 
 /**
@@ -41,6 +42,26 @@ class CompressionEngine(
     private var activeId: String? = null
     private var cancelledId: String? = null
     private var pollRunnable: Runnable? = null
+
+    /**
+     * The suspended `runTransformer` call for the active job.
+     *
+     * `Transformer.cancel()` tears the pipeline down **without** invoking
+     * `Transformer.Listener` (Media3 logs "Export error after export ended" and
+     * swallows any late codec error), so cancellation has to resume this itself
+     * or the caller's future would hang forever.
+     */
+    private var activeCont: CancellableContinuation<ExportResult>? = null
+
+    /**
+     * A cancel that arrived before its job registered.
+     *
+     * Dart binds the job id to its token before the channel call lands, so a
+     * cancel in that window would otherwise be dropped and the job would run to
+     * completion despite the token reading cancelled. Dart issues one compress at
+     * a time, so remembering the latest id is enough.
+     */
+    private var preCancelledId: String? = null
 
     // ---- estimate ----------------------------------------------------------
 
@@ -68,6 +89,11 @@ class CompressionEngine(
         outputDir: String? = null,
         outputName: String? = null,
     ): Map<String, Any?> {
+        // A cancel may have landed before this call did.
+        if (preCancelledId == id) {
+            preCancelledId = null
+            throw CompressionCancelledException()
+        }
         val info = MediaProbe.videoInfo(path)
         val srcW = info["width"] as Int
         val srcH = info["height"] as Int
@@ -142,32 +168,38 @@ class CompressionEngine(
             .setMuxerFactory(DefaultMuxer.Factory(MUXER_TIMEOUT_MS))
             .addListener(object : Transformer.Listener {
                 override fun onCompleted(composition: Composition, result: ExportResult) {
-                    finish()
+                    finishJob()
                     if (cont.isActive) cont.resume(result)
                 }
 
                 override fun onError(c: Composition, r: ExportResult, e: ExportException) {
-                    finish()
+                    // Read before finishJob(), which clears the flag.
+                    val wasCancelled = cancelledId == id
+                    finishJob()
                     if (!cont.isActive) return
-                    if (cancelledId == id) cont.resumeWithException(CompressionCancelledException())
+                    if (wasCancelled) cont.resumeWithException(CompressionCancelledException())
                     else cont.resumeWithException(RuntimeException(describe(e), e))
-                }
-
-                private fun finish() {
-                    stopProgressPolling()
-                    activeTransformer = null
-                    activeId = null
-                    CompressionForegroundService.stop(context)
                 }
             })
             .build()
 
         activeTransformer = transformer
         activeId = id
+        activeCont = cont
         CompressionForegroundService.start(context)
         transformer.start(editedItem, outFile.absolutePath)
         startProgressPolling(id, outFile)
         cont.invokeOnCancellation { mainHandler.post { runCatching { transformer.cancel() } } }
+    }
+
+    /** Tear down the active job's bookkeeping. Must run on the main looper. */
+    private fun finishJob() {
+        stopProgressPolling()
+        activeTransformer = null
+        activeId = null
+        activeCont = null
+        cancelledId = null
+        CompressionForegroundService.stop(context)
     }
 
     // ---- progress / cancel -------------------------------------------------
@@ -200,19 +232,39 @@ class CompressionEngine(
         pollRunnable = null
     }
 
+    /** Cancel [id], or the active job when [id] is null. */
     fun cancel(id: String?) {
-        val target = id ?: activeId ?: return
-        if (target == activeId) {
-            cancelledId = target
-            mainHandler.post { runCatching { activeTransformer?.cancel() } }
-        }
+        val requested = id ?: activeId ?: return
+        mainHandler.post { abort(requested) }
     }
 
     fun cancelAll() {
-        cancelledId = activeId
-        mainHandler.post { runCatching { activeTransformer?.cancel() } }
-        stopProgressPolling()
-        CompressionForegroundService.stop(context)
+        mainHandler.post { abort(activeId) }
+    }
+
+    /**
+     * Stop the active job and complete its caller with a cancellation.
+     *
+     * `Transformer.cancel()` never calls back into [Transformer.Listener], so
+     * resuming the continuation here is what keeps `compress()` from hanging.
+     * Runs on the main looper, where all job state is mutated.
+     */
+    private fun abort(id: String?) {
+        if (id == null) return
+        if (id != activeId) {
+            // Either already finished, or it hasn't registered yet — remember it
+            // so compress() can refuse to start.
+            preCancelledId = id
+            return
+        }
+        cancelledId = id
+        runCatching { activeTransformer?.cancel() }
+        val cont = activeCont
+        finishJob()
+        // A racing onError may already have resumed it; isActive guards that.
+        if (cont != null && cont.isActive) {
+            cont.resumeWithException(CompressionCancelledException())
+        }
     }
 
     fun isCompressing(): Boolean = activeTransformer != null

@@ -31,13 +31,20 @@ enum PluginFiles {
       base = "\(srcBase)_\(Int(Date().timeIntervalSince1970 * 1000))"
     }
     let fileName = "\(base).\(ext)"
+    var target = cacheDir().appendingPathComponent(fileName)
     if let dir = outputDir, dir.hasPrefix("/") {
       let dirURL = URL(fileURLWithPath: dir, isDirectory: true)
       try? FileManager.default.createDirectory(at: dirURL, withIntermediateDirectories: true)
       if FileManager.default.isWritableFile(atPath: dir) {
-        return dirURL.appendingPathComponent(fileName)
+        target = dirURL.appendingPathComponent(fileName)
       }
     }
-    return cacheDir().appendingPathComponent(fileName)
+    // Never write over the input: the engines still read the source afterwards
+    // (EXIF copy, size comparison), and clobbering it in place loses the original.
+    if target.standardizedFileURL.path == URL(fileURLWithPath: sourcePath).standardizedFileURL.path
+    {
+      return target.deletingLastPathComponent().appendingPathComponent("\(base)-1.\(ext)")
+    }
+    return target
   }
 }

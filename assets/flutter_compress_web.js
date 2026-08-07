@@ -80,9 +80,10 @@
             rotation: 0,
           });
         };
-        const ab = buf.slice(0);
-        ab.fileStart = 0;
-        file.appendBuffer(ab);
+        // mp4box needs a fileStart offset on the buffer itself; annotate the one
+        // we fetched rather than slicing a copy, which would double peak memory.
+        buf.fileStart = 0;
+        file.appendBuffer(buf);
         file.flush();
       } catch (e) { reject(e); }
     });
@@ -131,9 +132,9 @@
       file.onError = (e) => reject(new Error('mp4box: ' + e));
       file.onReady = (info) => resolve(info);
     });
-    const ab = buf.slice(0);
-    ab.fileStart = 0;
-    file.appendBuffer(ab);
+    // Annotate the fetched buffer instead of slicing a copy (see getInfo).
+    buf.fileStart = 0;
+    file.appendBuffer(buf);
     file.flush();
     const info = await ready;
     const vTrack = info.videoTracks[0];
@@ -309,6 +310,9 @@
       closeQuietly(decoder);
       closeQuietly(encoder);
       try { file.flush(); } catch (_) {}
+      // Don't let ids pile up: cancel() adds unconditionally, including for jobs
+      // that had already finished.
+      cancelled.delete(id);
     }
   };
 

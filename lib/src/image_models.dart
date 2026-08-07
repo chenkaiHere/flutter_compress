@@ -31,7 +31,10 @@ class ImageCompressConfig {
     this.lossless = false,
     this.keepOriginalIfLarger = true,
   })  : assert(quality >= 1 && quality <= 100, 'quality must be 1–100'),
-        assert(targetSizeKB == null || targetSizeKB > 0);
+        assert(targetSizeKB == null || targetSizeKB > 0,
+            'targetSizeKB must be > 0'),
+        assert(maxWidth == null || maxWidth > 0, 'maxWidth must be > 0'),
+        assert(maxHeight == null || maxHeight > 0, 'maxHeight must be > 0');
 
   /// Output format. When `null` (the default), the **source's format is kept**
   /// (a PNG stays PNG, a JPEG stays JPEG); set it only to convert to a specific

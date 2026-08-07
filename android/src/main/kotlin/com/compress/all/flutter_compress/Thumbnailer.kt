@@ -15,18 +15,27 @@ object Thumbnailer {
         maxWidth: Int?,
     ): String {
         val r = MediaMetadataRetriever()
+        var bmp: Bitmap? = null
         try {
             r.setDataSource(path)
-            var bmp = r.getFrameAtTime(positionMs * 1000)
-                ?: error("Could not extract frame")
+            bmp = r.getFrameAtTime(positionMs * 1000) ?: error("Could not extract frame")
             if (maxWidth != null && bmp.width > maxWidth) {
-                val h = (bmp.height * maxWidth.toFloat() / bmp.width).toInt()
-                bmp = Bitmap.createScaledBitmap(bmp, maxWidth, h, true)
+                val h = (bmp.height * maxWidth.toFloat() / bmp.width).toInt().coerceAtLeast(1)
+                val scaled = Bitmap.createScaledBitmap(bmp, maxWidth, h, true)
+                if (scaled !== bmp) bmp.recycle()
+                bmp = scaled
             }
             val out = File(dir, "thumb_${System.nanoTime()}.jpg")
-            FileOutputStream(out).use { bmp.compress(Bitmap.CompressFormat.JPEG, quality, it) }
+            val ok = FileOutputStream(out).use {
+                bmp.compress(Bitmap.CompressFormat.JPEG, quality, it)
+            }
+            if (!ok) {
+                out.delete()
+                error("Could not encode thumbnail")
+            }
             return out.absolutePath
         } finally {
+            bmp?.recycle()
             r.release()
         }
     }
