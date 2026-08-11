@@ -52,7 +52,12 @@ enum SizeMath {
 
   /// Output width/height: preserve aspect, only downscale to caps, then align.
   static func targetDimensions(srcW: Int, srcH: Int, config: CompressionConfig) -> (Int, Int) {
-    if srcW <= 0 || srcH <= 0 { return align(srcW, srcH, config.alignment) }
+    if srcW <= 0 || srcH <= 0 { return (srcW, srcH) }
+    // No cap requested → keep the source exactly. Aligning here would round 1080
+    // *up* to 1088, breaking the "only ever scale down" promise and forcing a
+    // needless full-frame rescale.
+    if config.maxWidth == nil && config.maxHeight == nil { return (srcW, srcH) }
+
     var w = Double(srcW)
     var h = Double(srcH)
     if let maxW = config.maxWidth, w > Double(maxW) {
@@ -69,8 +74,9 @@ enum SizeMath {
   }
 
   private static func align(_ w: Int, _ h: Int, _ alignment: String) -> (Int, Int) {
+    // Always round *down* so alignment can never upscale.
     let m = alignment == "auto16" ? 16 : 2
-    func round(_ v: Int) -> Int { max((v + m / 2) / m * m, m) }
-    return (round(w), round(h))
+    func down(_ v: Int) -> Int { max(v / m * m, m) }
+    return (down(w), down(h))
   }
 }

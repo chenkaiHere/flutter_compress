@@ -149,6 +149,10 @@ final class CompressionEngine {
       var compression: [String: Any] = [
         AVVideoAverageBitRateKey: videoBps,
         AVVideoMaxKeyFrameIntervalKey: Int(max(fps, 1) * 2),
+        // Apple recommends declaring the source frame rate: without it the rate
+        // controller has to guess the frame cadence, which makes the average
+        // bitrate — and therefore a requested target size — less accurate.
+        AVVideoExpectedSourceFrameRateKey: Int(max(fps, 1)),
       ]
       if codecType == .h264 {
         compression[AVVideoProfileLevelKey] = AVVideoProfileLevelH264HighAutoLevel

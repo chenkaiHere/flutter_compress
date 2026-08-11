@@ -61,11 +61,17 @@ object SizeMath {
      * requested caps, then align per [CompressionConfig.alignment].
      */
     fun targetDimensions(srcW: Int, srcH: Int, config: CompressionConfig): Pair<Int, Int> {
-        if (srcW <= 0 || srcH <= 0) return align(srcW, srcH, config.alignment)
-        var w = srcW.toDouble()
-        var h = srcH.toDouble()
+        if (srcW <= 0 || srcH <= 0) return srcW to srcH
         val maxW = config.maxWidth
         val maxH = config.maxHeight
+        // No cap requested → keep the source exactly. Aligning here would round
+        // 1080 *up* to 1088, which both breaks the "only ever scale down" promise
+        // and forces a full-frame GL rescale that starves the encoder on slower
+        // devices (frames get dropped, so the output is short, not just smaller).
+        if (maxW == null && maxH == null) return srcW to srcH
+
+        var w = srcW.toDouble()
+        var h = srcH.toDouble()
         if (maxW != null && w > maxW) {
             val s = maxW / w; w *= s; h *= s
         }
@@ -76,10 +82,10 @@ object SizeMath {
     }
 
     private fun align(w: Int, h: Int, alignment: String): Pair<Int, Int> {
-        // Encoders always require even dimensions; auto16 rounds to /16 to avoid
-        // macroblock padding artifacts on the edges.
+        // Encoders require even dimensions; auto16 uses /16 to avoid macroblock
+        // padding artifacts. Always round *down* so alignment can never upscale.
         val m = if (alignment == "auto16") 16 else 2
-        fun round(v: Int): Int = ((v + m / 2) / m * m).coerceAtLeast(m)
-        return round(w) to round(h)
+        fun down(v: Int): Int = (v / m * m).coerceAtLeast(m)
+        return down(w) to down(h)
     }
 }

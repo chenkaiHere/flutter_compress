@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.3.0
+
+- Fix: Android truncated every video to 30 seconds.
+- Android: alignment no longer upscales (1080 → 1088); target-size mode pins CBR.
+- iOS: more accurate target size.
+
 ## 1.2.0
 
 - Fix: cancelling a video on Android left the `compress()` future pending forever.

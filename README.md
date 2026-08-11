@@ -90,7 +90,7 @@ engine falls back to JPEG (the actual format is reported on the result).
 
 ```yaml
 dependencies:
-  flutter_compress: ^1.2.0
+  flutter_compress: ^1.3.0
 ```
 
 ## Quick start

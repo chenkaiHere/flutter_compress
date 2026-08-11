@@ -332,12 +332,17 @@ class _SizeMath {
 
   static (int, int) targetDimensions(
       int srcW, int srcH, VideoCompressConfig c) {
-    final m = c.alignment == DimensionAlignment.auto16 ? 16 : 2;
-    if (srcW <= 0 || srcH <= 0) return (_align(srcW, m), _align(srcH, m));
-    var w = srcW.toDouble();
-    var h = srcH.toDouble();
+    if (srcW <= 0 || srcH <= 0) return (srcW, srcH);
     final maxW = c.maxWidth;
     final maxH = c.maxHeight;
+    // No cap requested → keep the source exactly. Aligning here would round 1080
+    // *up* to 1088, breaking the "only ever scale down" promise and forcing a
+    // needless full-frame rescale.
+    if (maxW == null && maxH == null) return (srcW, srcH);
+
+    final m = c.alignment == DimensionAlignment.auto16 ? 16 : 2;
+    var w = srcW.toDouble();
+    var h = srcH.toDouble();
     if (maxW != null && w > maxW) {
       final s = maxW / w;
       w *= s;
@@ -351,8 +356,9 @@ class _SizeMath {
     return (_align(w.toInt(), m), _align(h.toInt(), m));
   }
 
+  /// Always rounds *down* so alignment can never upscale.
   static int _align(int v, int m) {
-    final r = ((v + m ~/ 2) ~/ m) * m;
+    final r = (v ~/ m) * m;
     return r < m ? m : r;
   }
 }

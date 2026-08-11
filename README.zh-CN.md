@@ -87,7 +87,7 @@
 
 ```yaml
 dependencies:
-  flutter_compress: ^1.2.0
+  flutter_compress: ^1.3.0
 ```
 
 ## 快速上手

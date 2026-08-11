@@ -1,9 +1,11 @@
 package com.compress.all.flutter_compress
 
 import android.content.Context
+import android.media.MediaCodecInfo
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.effect.Presentation
@@ -16,6 +18,7 @@ import androidx.media3.transformer.EncoderUtil
 import androidx.media3.transformer.ExportException
 import androidx.media3.transformer.ExportResult
 import androidx.media3.transformer.ProgressHolder
+import androidx.media3.transformer.TransformationRequest
 import androidx.media3.transformer.Transformer
 import androidx.media3.transformer.VideoEncoderSettings
 import java.io.File
@@ -108,7 +111,20 @@ class CompressionEngine(
         val outFile = context.resolveOutput(outputDir, outputName, path, "mp4")
 
         try {
-            runTransformer(id, buildEditedItem(path, config, tw, th), outFile, videoMime, videoBps)
+            val export = runTransformer(
+                id, buildEditedItem(path, config, srcW, srcH, tw, th), outFile, videoMime,
+                encoderSettings(config, videoMime, videoBps),
+            )
+            // A large gap here means the encoder ignored the requested bitrate, so
+            // a target size won't be met — worth surfacing, but only when it's bad.
+            val achieved = export.averageVideoBitrate
+            if (achieved > 0 && achieved < videoBps / 2) {
+                Log.w(
+                    TAG,
+                    "encoder delivered ${achieved / 1000}kbps of ${videoBps / 1000}kbps " +
+                        "requested (${export.videoEncoderName}); output will undershoot the target",
+                )
+            }
         } catch (e: Throwable) {
             // Cancellation and export errors both leave a partially muxed file
             // behind; don't let it accumulate in the cache.
@@ -133,7 +149,7 @@ class CompressionEngine(
     }
 
     private fun buildEditedItem(
-        path: String, config: CompressionConfig, tw: Int, th: Int,
+        path: String, config: CompressionConfig, srcW: Int, srcH: Int, tw: Int, th: Int,
     ): EditedMediaItem {
         val item = MediaItem.Builder().setUri(Uri.fromFile(File(path)))
         if (config.trimStartMs != null && config.trimEndMs != null) {
@@ -144,18 +160,72 @@ class CompressionEngine(
                     .build(),
             )
         }
-        val scale = Presentation.createForWidthAndHeight(tw, th, Presentation.LAYOUT_SCALE_TO_FIT)
+        // Only attach a scaling effect when the size actually changes. Attaching
+        // it unconditionally runs every frame through the GL pipeline, which on
+        // slower devices produces frames faster than the encoder drains them —
+        // the surface runs out of buffers and frames are silently dropped.
+        val effects = if (tw == srcW && th == srcH) {
+            Effects(emptyList(), emptyList())
+        } else {
+            Effects(
+                emptyList(),
+                listOf(Presentation.createForWidthAndHeight(tw, th, Presentation.LAYOUT_SCALE_TO_FIT)),
+            )
+        }
         return EditedMediaItem.Builder(item.build())
             .setRemoveAudio(config.removeAudio)
-            .setEffects(Effects(emptyList(), listOf(scale)))
+            .setEffects(effects)
             .build()
     }
 
+    /**
+     * Encoder settings for this job.
+     *
+     * Target-size mode pins **CBR**. With the default VBR the bitrate is only a
+     * soft average: the rate controller spends what it thinks the content needs,
+     * and re-encoding already-compressed footage looks "easy" to it (the first
+     * encode already discarded the fine detail), so it undershoots hard — an
+     * 80 MB target could land near 20 MB. Quality modes stay VBR, where letting
+     * the bitrate float with content is exactly the point.
+     *
+     * Falls back to VBR when no encoder for [videoMime] advertises CBR.
+     */
+    private fun encoderSettings(
+        config: CompressionConfig,
+        videoMime: String,
+        videoBps: Int,
+    ): VideoEncoderSettings {
+        val builder = VideoEncoderSettings.Builder().setBitrate(videoBps)
+        val cbrSupported = supportsCbr(videoMime)
+        val useCbr = config.targetSizeMB != null && cbrSupported
+        if (useCbr) {
+            builder.setBitrateMode(MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR)
+        }
+        // Media3 defaults `operating-rate` to Integer.MAX_VALUE. MediaCodec's
+        // documented sentinel for "as fast as possible" is Short.MAX_VALUE, so
+        // INT_MAX is out of contract; older Qualcomm OMX encoders can react to it
+        // by dropping input frames. Priority 1 = non-realtime, correct for a
+        // transcode (and what Media3 already requests).
+        builder.setEncoderPerformanceParameters(OPERATING_RATE_MAX, PRIORITY_NON_REALTIME)
+        return builder.build()
+    }
+
+    private fun supportsCbr(videoMime: String): Boolean =
+        EncoderUtil.getSupportedEncoders(videoMime).any { encoder ->
+            EncoderUtil.isBitrateModeSupported(
+                encoder, videoMime, MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR,
+            )
+        }
+
     private suspend fun runTransformer(
-        id: String, editedItem: EditedMediaItem, outFile: File, videoMime: String, videoBps: Int,
+        id: String,
+        editedItem: EditedMediaItem,
+        outFile: File,
+        videoMime: String,
+        videoEncoderSettings: VideoEncoderSettings,
     ): ExportResult = suspendCancellableCoroutine { cont ->
         val encoderFactory = DefaultEncoderFactory.Builder(context)
-            .setRequestedVideoEncoderSettings(VideoEncoderSettings.Builder().setBitrate(videoBps).build())
+            .setRequestedVideoEncoderSettings(videoEncoderSettings)
             .setEnableFallback(true) // let Media3 downgrade unsupported settings
             .build()
 
@@ -163,13 +233,25 @@ class CompressionEngine(
             .setVideoMimeType(videoMime)
             .setAudioMimeType(MimeTypes.AUDIO_AAC)
             .setEncoderFactory(encoderFactory)
-            // A generous inter-sample timeout prevents the common "Muxer error"
-            // (MUXING_TIMEOUT) on inputs whose tracks interleave unevenly.
-            .setMuxerFactory(DefaultMuxer.Factory(MUXER_TIMEOUT_MS))
+            // Use the default muxer factory. Its `long` overload is NOT a timeout:
+            // in Media3 1.4.x that parameter is `videoDurationMs`, so passing a
+            // "generous timeout" told the muxer the video was that many ms long
+            // and truncated every longer input to it. The no-arg constructor
+            // passes C.TIME_UNSET, i.e. "use the real duration".
+            .setMuxerFactory(DefaultMuxer.Factory())
             .addListener(object : Transformer.Listener {
                 override fun onCompleted(composition: Composition, result: ExportResult) {
                     finishJob()
                     if (cont.isActive) cont.resume(result)
+                }
+
+                override fun onFallbackApplied(
+                    composition: Composition,
+                    original: TransformationRequest,
+                    fallback: TransformationRequest,
+                ) {
+                    // Media3 silently downgraded what we asked for.
+                    Log.w(TAG, "fallback applied: $original -> $fallback")
                 }
 
                 override fun onError(c: Composition, r: ExportResult, e: ExportException) {
@@ -290,7 +372,10 @@ class CompressionEngine(
     }
 
     private companion object {
-        // Default muxer timeout is 10s; 30s is far more forgiving on real inputs.
-        const val MUXER_TIMEOUT_MS = 30_000L
+        const val TAG = "FlutterCompress"
+
+        /** MediaCodec's documented "as fast as possible" operating rate. */
+        const val OPERATING_RATE_MAX = 32767 // Short.MAX_VALUE
+        const val PRIORITY_NON_REALTIME = 1
     }
 }
