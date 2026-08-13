@@ -87,7 +87,7 @@
 
 ```yaml
 dependencies:
-  flutter_compress: ^1.3.0
+  flutter_compress: ^1.4.0
 ```
 
 ## 快速上手
@@ -211,7 +211,7 @@ try {
 } on CompressCancelled {
   // 被取消(视频/图片通用)
 } on ImageCompressException catch (e) {
-  print('${e.code}: ${e.message}');
+  if (e.code == CompressErrorCode.imageCompressFailed) { /* … */ }
 } on CompressException catch (e) {
   // 两套 API 的其他任何失败
 }
@@ -219,6 +219,9 @@ try {
 
 `CompressException` 是基类;`VideoCompressException` / `ImageCompressException` 各自细分,
 `CompressCancelled` 是两种取消异常共同实现的标记接口。
+
+判断错误请比对 **`CompressErrorCode`** 常量而不是裸字符串 —— 这套常量在三端各有一份镜像,
+且取值属于公开合同的一部分。
 
 `ImageCompressConfig` —— 优先级为 `lossless` → `targetSizeKB` → `quality`:
 

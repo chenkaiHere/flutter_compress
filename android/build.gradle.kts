@@ -27,6 +27,9 @@ android {
 
     defaultConfig {
         minSdk = 24
+        // Ships our R8 keep rules to consuming apps. Without this line the
+        // consumer-rules.pro file would be inert.
+        consumerProguardFiles("consumer-rules.pro")
     }
 
     testOptions {

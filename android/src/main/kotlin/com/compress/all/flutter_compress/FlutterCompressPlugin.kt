@@ -19,8 +19,10 @@ import kotlinx.coroutines.withContext
  * Bridges Flutter <-> the native pieces: [CompressionEngine] (transcode),
  * [MediaProbe], [Thumbnailer], [DownloadSaver].
  *
- * Everything runs on the main looper because Media3's `Transformer` must be
- * created and driven from a thread that has a [android.os.Looper].
+ * Only video transcoding runs on the main looper — Media3's `Transformer` must be
+ * created and driven from a thread that has a [android.os.Looper]. Everything
+ * else is dispatched to a background dispatcher and replies on the main thread
+ * (see [dispatch]).
  */
 class FlutterCompressPlugin :
     FlutterPlugin,
@@ -62,16 +64,16 @@ class FlutterCompressPlugin :
     }
 
     override fun onMethodCall(call: MethodCall, result: Result) {
-        val eng = engine ?: return result.error("no_engine", "Engine not initialized", null)
+        val eng = engine ?: return result.error(ErrorCode.NO_ENGINE, "Engine not initialized", null)
         when (call.method) {
             "getVideoInfo" ->
-                dispatch(result, "info_failed") { MediaProbe.videoInfo(call.str("path")) }
+                dispatch(result, ErrorCode.INFO_FAILED) { MediaProbe.videoInfo(call.str("path")) }
 
             "estimate" ->
-                dispatch(result, "estimate_failed") { eng.estimate(call.str("path"), call.config()) }
+                dispatch(result, ErrorCode.ESTIMATE_FAILED) { eng.estimate(call.str("path"), call.config()) }
 
             // Media3's Transformer must be created and driven from a Looper thread.
-            "compress" -> dispatch(result, "compress_failed", Dispatchers.Main.immediate) {
+            "compress" -> dispatch(result, ErrorCode.COMPRESS_FAILED, Dispatchers.Main.immediate) {
                 eng.compress(
                     call.str("id"), call.str("path"), call.config(),
                     call.argument<String>("outputDir"),
@@ -86,7 +88,7 @@ class FlutterCompressPlugin :
 
             "isCompressing" -> result.success(eng.isCompressing())
 
-            "getThumbnail" -> dispatch(result, "thumbnail_failed") {
+            "getThumbnail" -> dispatch(result, ErrorCode.THUMBNAIL_FAILED) {
                 Thumbnailer.generate(
                     context.compressCacheDir(), call.str("path"),
                     call.long("positionMs", 0), call.int("quality", 80),
@@ -99,16 +101,16 @@ class FlutterCompressPlugin :
                 result.success(null)
             }
 
-            "saveToDownloads" -> dispatch(result, "save_failed", Dispatchers.IO) {
+            "saveToDownloads" -> dispatch(result, ErrorCode.SAVE_FAILED, Dispatchers.IO) {
                 DownloadSaver.save(context, call.str("path"), call.argument<String>("fileName"))
             }
 
             // ---- images ----
-            "getImageInfo" -> dispatch(result, "image_info_failed") {
+            "getImageInfo" -> dispatch(result, ErrorCode.IMAGE_INFO_FAILED) {
                 imageEngine!!.info(call.str("path"))
             }
 
-            "compressImage" -> dispatch(result, "image_compress_failed") {
+            "compressImage" -> dispatch(result, ErrorCode.IMAGE_COMPRESS_FAILED) {
                 imageEngine!!.compress(
                     call.str("path"),
                     ImageConfig.fromMap(call.argument<Map<String, Any?>>("config")!!),
@@ -139,7 +141,7 @@ class FlutterCompressPlugin :
             runCatching { withContext(ctx) { block() } }
                 .onSuccess { result.success(it) }
                 .onFailure { e ->
-                    if (e is CompressionCancelledException) result.error("cancelled", e.message, null)
+                    if (e is CompressionCancelledException) result.error(ErrorCode.CANCELLED, e.message, null)
                     else result.error(errorCode, e.message, null)
                 }
         }

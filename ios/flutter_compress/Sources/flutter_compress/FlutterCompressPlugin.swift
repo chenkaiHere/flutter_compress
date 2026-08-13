@@ -17,9 +17,17 @@ public class FlutterCompressPlugin: NSObject, FlutterPlugin, FlutterStreamHandle
     let instance = FlutterCompressPlugin()
     registrar.addMethodCallDelegate(instance, channel: methodChannel)
     eventChannel.setStreamHandler(instance)
+    // publish() is what earns us `detachFromEngine(for:)`, so an engine teardown
+    // can stop an in-flight export instead of leaving it running.
+    registrar.publish(instance)
     instance.engine.onProgress = { [weak instance] payload in
       DispatchQueue.main.async { instance?.eventSink?(payload) }
     }
+  }
+
+  public func detachFromEngine(for registrar: FlutterPluginRegistrar) {
+    engine.cancelAll()
+    eventSink = nil
   }
 
   public func onListen(withArguments _: Any?, eventSink events: @escaping FlutterEventSink)
@@ -49,10 +57,10 @@ public class FlutterCompressPlugin: NSObject, FlutterPlugin, FlutterStreamHandle
 
     switch call.method {
     case "getVideoInfo":
-      dispatch(result, "info_failed") { try MediaProbe.videoInfo(path: try str("path")) }
+      dispatch(result, ErrorCode.infoFailed) { try MediaProbe.videoInfo(path: try str("path")) }
 
     case "estimate":
-      dispatch(result, "estimate_failed") {
+      dispatch(result, ErrorCode.estimateFailed) {
         try self.engine.estimate(
           path: try str("path"), config: CompressionConfig(map: try map("config")))
       }
@@ -62,7 +70,7 @@ public class FlutterCompressPlugin: NSObject, FlutterPlugin, FlutterStreamHandle
         let id = try? str("id"), let path = try? str("path")
       else {
         result(
-          FlutterError(code: "bad_arguments", message: "compress: missing id/path/config", details: nil))
+          FlutterError(code: ErrorCode.badArguments, message: "compress: missing id/path/config", details: nil))
         return
       }
       let outputDir = a["outputDir"] as? String, outputName = a["outputName"] as? String
@@ -70,12 +78,17 @@ public class FlutterCompressPlugin: NSObject, FlutterPlugin, FlutterStreamHandle
         self.engine.compress(
           id: id, path: path, config: config, outputDir: outputDir, outputName: outputName
         ) { outcome in
-          switch outcome {
-          case .success(let map): result(map)
-          case .cancelled:
-            result(FlutterError(code: "cancelled", message: "Compression cancelled", details: nil))
-          case .failure(let message):
-            result(FlutterError(code: "compress_failed", message: message, details: nil))
+          // The engine finishes on its own queue; reply on the platform thread.
+          DispatchQueue.main.async {
+            switch outcome {
+            case .success(let map): result(map)
+            case .cancelled:
+              result(
+                FlutterError(
+                  code: ErrorCode.cancelled, message: "Compression cancelled", details: nil))
+            case .failure(let message):
+              result(FlutterError(code: ErrorCode.compressFailed, message: message, details: nil))
+            }
           }
         }
       }
@@ -88,7 +101,7 @@ public class FlutterCompressPlugin: NSObject, FlutterPlugin, FlutterStreamHandle
       result(engine.isCompressing())
 
     case "getThumbnail":
-      dispatch(result, "thumbnail_failed") {
+      dispatch(result, ErrorCode.thumbnailFailed) {
         try Thumbnailer.generate(
           dir: PluginFiles.cacheDir(), path: try str("path"),
           positionMs: (a["positionMs"] as? NSNumber)?.int64Value ?? 0,
@@ -101,16 +114,16 @@ public class FlutterCompressPlugin: NSObject, FlutterPlugin, FlutterStreamHandle
       result(nil)
 
     case "saveToDownloads":
-      dispatch(result, "save_failed") {
+      dispatch(result, ErrorCode.saveFailed) {
         try DownloadSaver.save(path: try str("path"), fileName: a["fileName"] as? String)
       }
 
     // ---- images ----
     case "getImageInfo":
-      dispatch(result, "image_info_failed") { try ImageEngine.info(path: try str("path")) }
+      dispatch(result, ErrorCode.imageInfoFailed) { try ImageEngine.info(path: try str("path")) }
 
     case "compressImage":
-      dispatch(result, "image_compress_failed") {
+      dispatch(result, ErrorCode.imageCompressFailed) {
         try ImageEngine.compress(
           path: try str("path"),
           config: ImageConfig(map: try map("config")),
@@ -123,14 +136,23 @@ public class FlutterCompressPlugin: NSObject, FlutterPlugin, FlutterStreamHandle
     }
   }
 
-  /// Run a throwing [block] off the main thread, forwarding its value or a typed error.
+  /// Run a throwing [block] off the main thread, then deliver its value (or a
+  /// typed error) **on the main queue** — a `FlutterResult` must be invoked from
+  /// the platform thread, and replying from a background queue is the kind of
+  /// race that only shows up as a rare crash on user devices.
   private func dispatch(
     _ result: @escaping FlutterResult, _ errorCode: String, _ block: @escaping () throws -> Any?
   ) {
     workQueue.async {
-      do { result(try block()) }
-      catch {
-        result(FlutterError(code: errorCode, message: error.localizedDescription, details: nil))
+      let outcome: Result<Any?, Error>
+      do { outcome = .success(try block()) } catch { outcome = .failure(error) }
+      DispatchQueue.main.async {
+        switch outcome {
+        case .success(let value):
+          result(value)
+        case .failure(let error):
+          result(FlutterError(code: errorCode, message: error.localizedDescription, details: nil))
+        }
       }
     }
   }

@@ -5,6 +5,7 @@ import 'src/exceptions.dart';
 import 'src/image_models.dart';
 import 'src/models.dart';
 
+export 'src/error_codes.dart';
 export 'src/exceptions.dart';
 export 'src/image_models.dart';
 export 'src/models.dart';

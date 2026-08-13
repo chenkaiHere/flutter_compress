@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.4.0
+
+- iOS: reply to channel calls on the platform thread, and stop an in-flight
+  export when the engine detaches.
+- iOS: the privacy manifest is now actually packaged (podspec + SPM) — App Store
+  requires it from third-party SDKs.
+- Android: ship `consumer-rules.pro` so apps with R8 enabled don't have to guess.
+- Add `CompressErrorCode` — the `code` values are now named constants, mirrored
+  on all three platforms. Values are unchanged.
+
 ## 1.3.0
 
 - Fix: Android truncated every video to 30 seconds.

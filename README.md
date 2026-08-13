@@ -90,7 +90,7 @@ engine falls back to JPEG (the actual format is reported on the result).
 
 ```yaml
 dependencies:
-  flutter_compress: ^1.3.0
+  flutter_compress: ^1.4.0
 ```
 
 ## Quick start
@@ -215,11 +215,14 @@ try {
 } on CompressCancelled {
   // cancelled (video or image)
 } on ImageCompressException catch (e) {
-  print('${e.code}: ${e.message}');
+  if (e.code == CompressErrorCode.imageCompressFailed) { /* … */ }
 } on CompressException catch (e) {
   // any other failure from either API
 }
 ```
+
+Match on `CompressErrorCode` rather than raw strings — the constants are mirrored
+on all three platforms, and the values are part of the public contract.
 
 `CompressException` is the base; `VideoCompressException` / `ImageCompressException`
 narrow it, and `CompressCancelled` is a marker both cancel types implement.
