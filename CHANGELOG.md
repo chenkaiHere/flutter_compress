@@ -2,6 +2,8 @@
 
 ## 1.5.0
 
+- iOS: fix a compile error that broke every 1.4.0 iOS build (`CompressionEngine`
+  was missing `cancelAll`). Reported by @waitwalker.
 - Add `keepAliveInBackground` — set `false` to skip Android's foreground service
   and its notification.
 - iOS: fix a retain cycle that leaked the engine; a cancel arriving before the
