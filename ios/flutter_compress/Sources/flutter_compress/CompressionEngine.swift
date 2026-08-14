@@ -314,6 +314,10 @@ final class CompressionEngine {
 
   // MARK: - Cancel
 
+  func cancelAll() {
+    cancel(id: nil)
+  }
+
   func cancel(id: String?) {
     lock.lock()
     if id == nil || id == activeId {
