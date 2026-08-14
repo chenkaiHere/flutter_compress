@@ -65,8 +65,10 @@ class _ImageCompressPageState extends State<ImageCompressPage> {
 
   Future<void> _pick() async {
     final l10n = AppLocalizations.of(context);
-    final result =
-        await FilePicker.pickFiles(type: FileType.image, withData: kIsWeb);
+    final result = await FilePicker.pickFiles(
+      type: FileType.image,
+      withData: kIsWeb,
+    );
     final path = result?.files.single.xFile.path;
     if (path == null || path.isEmpty) return;
     setState(() {
@@ -100,8 +102,10 @@ class _ImageCompressPageState extends State<ImageCompressPage> {
     if (path == null) return _appendLog(l10n.logPickVideoFirst);
     try {
       final i = await _compressor.getImageInfo(path);
-      _appendLog('${i.width}x${i.height}, '
-          '${(i.sizeBytes / 1024).toStringAsFixed(0)} KB, ${i.format ?? '—'}');
+      _appendLog(
+        '${i.width}x${i.height}, '
+        '${(i.sizeBytes / 1024).toStringAsFixed(0)} KB, ${i.format ?? '—'}',
+      );
     } catch (e) {
       _appendLog(l10n.logInfoError('$e'));
     }
@@ -128,17 +132,22 @@ class _ImageCompressPageState extends State<ImageCompressPage> {
         _appendLog(l10n.logSkipped);
         return;
       }
-      _appendLog(l10n.logDone(
-        (r.compressedSizeBytes / 1024).toStringAsFixed(0),
-        r.savedPercent.toStringAsFixed(1),
-        '${r.format} ${r.width}x${r.height}',
-      ).replaceFirst('MB', 'KB'));
+      _appendLog(
+        l10n
+            .logDone(
+              (r.compressedSizeBytes / 1024).toStringAsFixed(0),
+              r.savedPercent.toStringAsFixed(1),
+              '${r.format} ${r.width}x${r.height}',
+            )
+            .replaceFirst('MB', 'KB'),
+      );
       if (routeToDownloads) {
         final saved = await _compressor.saveToDownloads(
           r.outputPath,
           // Use the format actually written (lossless may fall back to PNG),
           // so the extension — and thus the saved MIME type — is correct.
-          fileName: 'compressed_${DateTime.now().millisecondsSinceEpoch}.${_ext(r.format)}',
+          fileName:
+              'compressed_${DateTime.now().millisecondsSinceEpoch}.${_ext(r.format)}',
         );
         _appendLog(l10n.logSavedToDownloads(saved));
       } else {
@@ -152,12 +161,12 @@ class _ImageCompressPageState extends State<ImageCompressPage> {
   }
 
   String _ext(String format) => switch (format) {
-        'jpeg' || 'jpg' => 'jpg',
-        'png' => 'png',
-        'webp' => 'webp',
-        'heic' => 'heic',
-        _ => format,
-      };
+    'jpeg' || 'jpg' => 'jpg',
+    'png' => 'png',
+    'webp' => 'webp',
+    'heic' => 'heic',
+    _ => format,
+  };
 
   static const _wideBreakpoint = 900.0;
 
@@ -366,9 +375,13 @@ class _ImageCompressPageState extends State<ImageCompressPage> {
             children: [
               Icon(Icons.image_outlined, color: c.accent, size: 34),
               const SizedBox(height: 10),
-              Text(l10n.pickImage,
-                  style: TextStyle(
-                      color: c.textPrimary, fontWeight: FontWeight.w600)),
+              Text(
+                l10n.pickImage,
+                style: TextStyle(
+                  color: c.textPrimary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ],
           ),
         ),
@@ -395,26 +408,35 @@ class _ImageCompressPageState extends State<ImageCompressPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(l10n.inputImage,
-                        style: TextStyle(color: c.textMuted, fontSize: 11)),
+                    Text(
+                      l10n.inputImage,
+                      style: TextStyle(color: c.textMuted, fontSize: 11),
+                    ),
                     const SizedBox(height: 3),
                     Text(
                       _inputPath!.split('/').last,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                          color: c.textPrimary,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700),
+                        color: c.textPrimary,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     if (info != null)
-                      Wrap(spacing: 6, runSpacing: 6, children: [
-                        LabelChip('${info.width}x${info.height}'),
-                        LabelChip('${(info.sizeBytes / 1024).toStringAsFixed(0)} KB'),
-                        if (info.format != null)
-                          LabelChip(info.format!.toUpperCase()),
-                      ]),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: [
+                          LabelChip('${info.width}x${info.height}'),
+                          LabelChip(
+                            '${(info.sizeBytes / 1024).toStringAsFixed(0)} KB',
+                          ),
+                          if (info.format != null)
+                            LabelChip(info.format!.toUpperCase()),
+                        ],
+                      ),
                   ],
                 ),
               ),
@@ -453,21 +475,24 @@ class _ImageCompressPageState extends State<ImageCompressPage> {
 
   Widget _modeSelector(AppLocalizations l10n) {
     Widget toggle(IconData icon, String label, ImgMode mode) => Expanded(
-          child: ModeToggle(
-            icon: icon,
-            label: label,
-            selected: _mode == mode,
-            onTap: _busy ? null : () => setState(() => _mode = mode),
-          ),
-        );
+      child: ModeToggle(
+        icon: icon,
+        label: label,
+        selected: _mode == mode,
+        onTap: _busy ? null : () => setState(() => _mode = mode),
+      ),
+    );
     return Row(
       children: [
         toggle(Icons.data_usage, l10n.modeTargetSize, ImgMode.targetSize),
         const SizedBox(width: 10),
         toggle(Icons.star_outline, l10n.modeQuality, ImgMode.quality),
         const SizedBox(width: 10),
-        toggle(Icons.diamond_outlined, l10n.modeVisualLossless,
-            ImgMode.visualLossless),
+        toggle(
+          Icons.diamond_outlined,
+          l10n.modeVisualLossless,
+          ImgMode.visualLossless,
+        ),
       ],
     );
   }
@@ -482,7 +507,11 @@ class _ImageCompressPageState extends State<ImageCompressPage> {
             Expanded(
               child: Text(
                 l10n.visualLosslessHint,
-                style: TextStyle(color: c.textSecondary, fontSize: 13, height: 1.35),
+                style: TextStyle(
+                  color: c.textSecondary,
+                  fontSize: 13,
+                  height: 1.35,
+                ),
               ),
             ),
           ],
@@ -490,13 +519,16 @@ class _ImageCompressPageState extends State<ImageCompressPage> {
       );
     }
     if (_mode == ImgMode.targetSize) {
-      final maxKB =
-          (_info != null ? (_info!.sizeBytes / 1024).ceil() : 2000).clamp(20, 100000);
+      final maxKB = (_info != null ? (_info!.sizeBytes / 1024).ceil() : 2000)
+          .clamp(20, 100000);
       return GlassCard(
         child: Column(
           children: [
             ValueReadout(
-                label: l10n.targetSizeKb, value: '$_targetSizeKB', unit: 'KB'),
+              label: l10n.targetSizeKb,
+              value: '$_targetSizeKB',
+              unit: 'KB',
+            ),
             Slider(
               value: _targetSizeKB.clamp(10, maxKB).toDouble(),
               min: 10,

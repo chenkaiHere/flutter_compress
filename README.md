@@ -61,8 +61,9 @@ bitrate", "under 200 KB" — instead of making you guess at opaque quality knobs
 | Compress (target size / bitrate / quality) |          ✅           |         ✅         |        ✅         |
 | HEVC (H.265) with H.264 fallback           |          ✅           |         ✅         |        ✅         |
 | Resolution cap (`maxWidth`/`maxHeight`)    |          ✅           |         ✅         |        ✅         |
-| Frame-rate cap (`frameRate`)               |          ⚠️          |         ✅         |        ✅         |
-| Audio: remove / bitrate                    |          ✅           |         ✅         |        ⚠️        |
+| Frame-rate cap (`frameRate`)               |        ❌ ²          |         ✅         |       ❌ ²        |
+| Audio: remove                              |          ✅           |         ✅         |    ❌ always off   |
+| Audio: bitrate (`audioBitrateKbps`)        |        ❌ ³          |         ✅         |        ❌         |
 | Trim (`trim`)                              |          ✅           |         ✅         |        ❌         |
 | Thumbnail / info / estimate                |          ✅           |         ✅         |        ✅         |
 | Progress / cancel / batch                  |          ✅           |         ✅         |        ✅         |
@@ -72,15 +73,25 @@ bitrate", "under 200 KB" — instead of making you guess at opaque quality knobs
 ¹ Web uses HEVC only where the browser supports WebCodecs HEVC encoding
 (e.g. Safari, Chrome with HW HEVC); otherwise it falls back to H.264.
 
+² Only iOS can decimate frames. Media3 has no frame-dropping effect, and the web
+pipeline re-encodes every decoded frame — on both, `frameRate` only influences the
+bitrate/keyframe maths. Read `result.frameRate` for what was actually written.
+
+³ Media3 1.4.x exposes no audio-encoder settings, so Android encodes AAC at its
+own default. The value still shapes the `targetSizeMB` budget.
+
+Anything marked ❌ is **ignored**, not approximated — the result object reports what
+actually happened (`result.frameRate`, `result.hasAudio`, `result.durationMs`).
+
 ### 🖼️ Image
 
 | Capability                              |  Android   |    iOS    |       Web        |
 |-----------------------------------------|:----------:|:---------:|:----------------:|
 | Compress (target size / quality)        |     ✅      |     ✅     |        ✅         |
 | JPEG / PNG / WebP                       |     ✅      |     ✅     |        ✅         |
-| HEIC                                    |     ⚠️     |     ✅     |        ❌         |
+| HEIC                                    |    ⚠️ ¹    |     ✅     |        ❌         |
 | Resolution cap (`maxWidth`/`maxHeight`) |     ✅      |     ✅     |        ✅         |
-| Keep EXIF (`keepExif`)                  |     ✅      |     ✅     |        ❌         |
+| Keep EXIF (`keepExif`)                  |   ⚠️ JPEG only |  ✅   |        ❌         |
 | `saveToDownloads`                       | MediaStore | Documents | browser download |
 
 ¹ Android only writes HEIC when a device HEIC encoder is present; otherwise the
@@ -90,7 +101,7 @@ engine falls back to JPEG (the actual format is reported on the result).
 
 ```yaml
 dependencies:
-  flutter_compress: ^1.4.0
+  flutter_compress: ^1.5.0
 ```
 
 ## Quick start
@@ -132,6 +143,7 @@ print('saved ${result.savedPercent.toStringAsFixed(1)}% → ${result.outputPath}
 | `alignment`                        | `auto16` (default) rounds to `÷16` to avoid edge artifacts.    |
 | `keepOriginalIfLarger`             | Return the original if compression wouldn't help.              |
 | `container`                        | `auto` (default) keeps the source container where the platform can (iOS `.mov`/`.mp4`; Android/Web → `.mp4`), or `mp4` to force it. |
+| `keepAliveInBackground`            | Default on. Android starts a foreground service (with a notification) so the encode survives backgrounding; set `false` for foreground-only flows and no notification appears. Ignored on iOS and web. |
 
 ## API
 
@@ -241,19 +253,69 @@ narrow it, and `CompressCancelled` is a marker both cancel types implement.
 
 ## Platform setup
 
-- **Android** — min SDK 24, `compileSdk 36`. The plugin declares
-  `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_DATA_SYNC`, `POST_NOTIFICATIONS`,
-  and (for `saveToDownloads` on API ≤ 28) `WRITE_EXTERNAL_STORAGE`.
+- **Android** — min SDK 24, `compileSdk 36`. Declares four permissions; see
+  [Android permissions](#android-permissions) below — none of them are runtime
+  permissions the plugin requests on its own.
 - **iOS** — min 13.0. Uses `beginBackgroundTask` for a short background grace
   period. To make `saveToDownloads` files visible in the Files app, add
   `UIFileSharingEnabled` and `LSSupportsOpeningDocumentsInPlace` to `Info.plist`.
 - **Web** — needs WebCodecs (Chrome/Edge 94+, Safari 16.4+). Inputs/outputs are
-  `blob:` URLs; the vendored demux/mux JS (~0.2 MB) loads lazily on first use.
+  `blob:` URLs; the vendored demux/mux JS (216 KB, see
+  [THIRD_PARTY_NOTICES](assets/THIRD_PARTY_NOTICES.md)) loads lazily on first
+  video compression — image compression never fetches it.
   Pick a file via `file_picker` and pass `xFile.path` (a `blob:` URL on web).
   **Call `releaseOutput(result.outputPath)`** once you've downloaded or uploaded a
   result — the browser otherwise holds the whole encoded file in memory for the
   life of the page (`clearCache()` releases every output at once).
   Try the [live demo](https://flutter-compress.ckdgdgdg.workers.dev/) to see it in action.
+
+### Android permissions
+
+Everything below merges into **your** app's manifest, so here is exactly what
+arrives and why. The plugin never requests a runtime permission itself — that
+timing is your product's call.
+
+| Permission | Used for | Required? | If you remove it |
+|---|---|---|---|
+| `FOREGROUND_SERVICE` | Keeping a video encode alive while the app is backgrounded | Optional | Plugin logs a warning and encodes without background protection |
+| `FOREGROUND_SERVICE_DATA_SYNC` | Same, mandatory typing on Android 14+ | Optional | Same as above |
+| `POST_NOTIFICATIONS` | The notification that a foreground service must show | Optional | Android 13+ suppresses the notification; the encode still runs |
+| `WRITE_EXTERNAL_STORAGE` (`maxSdkVersion="28"`) | `saveToDownloads()` on Android 9 and below | Needed for `saveToDownloads` on API ≤ 28 | `saveToDownloads` fails on API ≤ 28; API 29+ is unaffected (MediaStore) |
+
+**Image-only, or foreground-only?** Pass
+`VideoCompressConfig(keepAliveInBackground: false)` so no service ever starts,
+then strip the first three from the merged manifest:
+
+```xml
+<uses-permission android:name="android.permission.FOREGROUND_SERVICE"
+    tools:node="remove" />
+<uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"
+    tools:node="remove" />
+<uses-permission android:name="android.permission.POST_NOTIFICATIONS"
+    tools:node="remove" />
+```
+
+Image compression never starts the service, so removing them costs image-only
+apps nothing.
+
+### Native dependencies
+
+| Dependency | Version | Unshrunk size | Notes |
+|---|---|---|---|
+| `androidx.media3:media3-transformer` + `-effect`, `-common`, `-muxer` | 1.4.1 | ~3.4 MB of AARs including transitive ExoPlayer modules | The video pipeline. R8 removes a large share of this; measure your own release build |
+| `androidx.core:core-ktx` | 1.15.0 | ~0.2 MB | Almost always already present — Flutter pulls `androidx.core` in |
+| `org.jetbrains.kotlinx:kotlinx-coroutines-android` | 1.8.1 | ~20 KB | Also usually already present |
+
+iOS and web add **no** third-party native dependencies: iOS uses AVFoundation
+and ImageIO from the SDK, web uses the browser's WebCodecs plus two vendored JS
+bundles (see [THIRD_PARTY_NOTICES](assets/THIRD_PARTY_NOTICES.md) for sizes and
+licences).
+
+Versions are pinned to the ones actually tested rather than floated. Gradle
+resolves conflicts upward, so an app declaring a newer Media3 still wins — but
+the plugin won't silently adopt one. (Media3 changed the meaning of a
+`DefaultMuxer.Factory` parameter inside its 1.x line once, which truncated every
+output to 30 seconds while compiling perfectly cleanly.)
 
 ## Known limitations
 

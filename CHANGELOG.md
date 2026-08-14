@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.5.0
+
+- Add `keepAliveInBackground` — set `false` to skip Android's foreground service
+  and its notification.
+- iOS: fix a retain cycle that leaked the engine; a cancel arriving before the
+  job starts is no longer dropped.
+- Web: `cancel()` with no id now works; `releaseOutput` no longer revokes your
+  own input URL.
+- Android: a missing `FOREGROUND_SERVICE` permission no longer crashes the encode.
+
 ## 1.4.0
 
 - iOS: reply to channel calls on the platform thread, and stop an in-flight

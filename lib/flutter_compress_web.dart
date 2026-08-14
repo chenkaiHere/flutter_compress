@@ -5,8 +5,10 @@ import 'package:flutter_web_plugins/flutter_web_plugins.dart';
 import 'package:web/web.dart' as web;
 
 import 'flutter_compress_platform_interface.dart';
+import 'src/error_codes.dart';
 import 'src/exceptions.dart';
 import 'src/image_models.dart';
+import 'src/size_math.dart';
 import 'src/models.dart';
 
 // ---- JS bindings to assets/flutter_compress_web.js -----------------------
@@ -27,6 +29,9 @@ external JSPromise<JSObject> _jsCompress(
 
 @JS('flutterCompressWeb.cancel')
 external void _jsCancel(String id);
+
+@JS('flutterCompressWeb.cancelAll')
+external void _jsCancelAll();
 
 @JS('flutterCompressWeb.download')
 external JSPromise<JSString> _jsDownload(String url, String? fileName);
@@ -65,36 +70,74 @@ class FlutterCompressWeb extends FlutterCompressPlatform {
   static const _base = 'assets/packages/flutter_compress/assets/';
   Future<void>? _imgLoaded;
 
-  Future<void> _ensureLoaded() => _loaded ??= _load();
+  Future<void> _ensureLoaded() async {
+    // Don't cache a failed load: one transient network error would otherwise
+    // disable video for the rest of the session.
+    final pending = _loaded ??= _load();
+    try {
+      await pending;
+    } catch (_) {
+      if (identical(_loaded, pending)) _loaded = null;
+      rethrow;
+    }
+  }
+
+  /// True once `flutter_compress_web.js` has actually run, i.e. the
+  /// `flutterCompressWeb` namespace exists. A pending `_loaded` future is not
+  /// enough — calling into the namespace before then throws.
+  bool _engineReady = false;
+
+  Future<void> _loadEngine() async {
+    await _loadScript('${_base}flutter_compress_web.js');
+    _engineReady = true;
+  }
 
   Future<void> _load() async {
     await _loadScript('${_base}mp4box.all.min.js');
     await _loadScript('${_base}mp4-muxer.js');
-    await _loadScript('${_base}flutter_compress_web.js');
+    await _loadEngine();
     if (!_jsIsSupported()) {
-      throw VideoCompressException('unsupported',
+      throw VideoCompressException(CompressErrorCode.unsupported,
           'WebCodecs / MP4 tooling not available in this browser');
     }
   }
 
   /// Images only need the engine file (canvas-based) — skip the heavier
   /// demux/mux libs and the WebCodecs support gate.
-  Future<void> _ensureImageLoaded() =>
-      _imgLoaded ??= _loadScript('${_base}flutter_compress_web.js');
-
-  Future<void> _loadScript(String src) {
-    final completer = Completer<void>();
-    final script =
-        web.document.createElement('script') as web.HTMLScriptElement;
-    script.src = src;
-    script.type = 'text/javascript';
-    script.addEventListener(
-        'load', ((web.Event _) => completer.complete()).toJS);
-    script.addEventListener('error',
-        ((web.Event _) => completer.completeError('failed: $src')).toJS);
-    web.document.head!.appendChild(script);
-    return completer.future;
+  Future<void> _ensureImageLoaded() async {
+    final pending = _imgLoaded ??= _loadEngine();
+    try {
+      await pending;
+    } catch (_) {
+      if (identical(_imgLoaded, pending)) _imgLoaded = null;
+      rethrow;
+    }
   }
+
+  /// Tracks in-flight//completed script loads by URL. Both lazy loaders pull in
+  /// `flutter_compress_web.js`; without this the second one appends a duplicate
+  /// `<script>` (the engine guards against re-running, but the fetch is waste).
+  static final Map<String, Future<void>> _scripts = {};
+
+  Future<void> _loadScript(String src) => _scripts.putIfAbsent(src, () {
+        final completer = Completer<void>();
+        final script =
+            web.document.createElement('script') as web.HTMLScriptElement;
+        script.src = src;
+        script.type = 'text/javascript';
+        script.addEventListener(
+            'load', ((web.Event _) => completer.complete()).toJS);
+        script.addEventListener(
+            'error',
+            ((web.Event _) => completer.completeError(VideoCompressException(
+                CompressErrorCode.unsupported, 'Could not load $src'))).toJS);
+        web.document.head!.appendChild(script);
+        return completer.future.catchError((Object e) {
+          // Let a retry re-attempt the fetch rather than replaying the failure.
+          _scripts.remove(src);
+          throw e;
+        });
+      });
 
   // ---- info / estimate ---------------------------------------------------
 
@@ -119,8 +162,15 @@ class FlutterCompressWeb extends FlutterCompressPlatform {
     final srcH = (m['height'] as num).toInt();
     final durationMs = _clampDuration((m['durationMs'] as num).toInt(), config);
     final srcKbps = (m['bitrateKbps'] as num).toInt();
-    final (tw, th) = _SizeMath.targetDimensions(srcW, srcH, config);
-    final videoBps = _SizeMath.videoBitrateBps(config, durationMs, srcKbps, th);
+    final (tw, th) = SizeMath.targetDimensions(srcW, srcH, config);
+    final videoBps = SizeMath.videoBitrateBps(
+      config: config,
+      durationMs: durationMs,
+      sourceBitrateKbps: srcKbps,
+      targetHeight: th,
+      // Web v1 drops the audio track, so the whole budget goes to video.
+      reserveAudio: false,
+    );
     final bytes = (videoBps * (durationMs / 1000) / 8).round();
     return CompressionEstimate.fromMap({
       'estimatedSizeBytes': bytes,
@@ -151,12 +201,19 @@ class FlutterCompressWeb extends FlutterCompressPlatform {
       final srcH = (m['height'] as num).toInt();
       // Use the same duration `estimate` does, so the two agree. (Web doesn't
       // apply the trim window yet, but the bitrate budget must still match.)
-      final durationMs = _clampDuration((m['durationMs'] as num).toInt(), config);
+      final durationMs =
+          _clampDuration((m['durationMs'] as num).toInt(), config);
       final srcKbps = (m['bitrateKbps'] as num).toInt();
       final srcBytes = (m['sizeBytes'] as num).toInt();
-      final (tw, th) = _SizeMath.targetDimensions(srcW, srcH, config);
-      final videoBps =
-          _SizeMath.videoBitrateBps(config, durationMs, srcKbps, th);
+      final (tw, th) = SizeMath.targetDimensions(srcW, srcH, config);
+      final videoBps = SizeMath.videoBitrateBps(
+        config: config,
+        durationMs: durationMs,
+        sourceBitrateKbps: srcKbps,
+        targetHeight: th,
+        // Web v1 drops the audio track, so the whole budget goes to video.
+        reserveAudio: false,
+      );
 
       final cfg = <String, Object?>{
         'id': id,
@@ -194,6 +251,8 @@ class FlutterCompressWeb extends FlutterCompressPlatform {
         durationMs: (r['durationMs'] as num).toInt(),
         codec: r['codec'] as String,
         skipped: r['skipped'] == true,
+        frameRate: (r['frameRate'] as num?)?.toDouble(),
+        hasAudio: r['hasAudio'] as bool?,
       );
     } catch (e) {
       final msg = e.toString();
@@ -208,11 +267,28 @@ class FlutterCompressWeb extends FlutterCompressPlatform {
 
   @override
   Future<void> cancel(String? id) async {
-    if (id != null) _jsCancel(id);
+    // Nothing is loaded until the first compress, so a cancel before that has
+    // nothing to target — and touching the JS namespace would throw.
+    if (!_engineReady) return;
+    if (id != null) {
+      _jsCancel(id);
+    } else {
+      _jsCancelAll();
+    }
   }
 
   @override
   Future<bool> isCompressing() async => _busy;
+
+  @override
+  Future<bool> isSupported() async {
+    try {
+      await _ensureLoaded();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
 
   @override
   Future<String> getThumbnail(
@@ -231,13 +307,16 @@ class FlutterCompressWeb extends FlutterCompressPlatform {
   Future<void> clearCache() async {
     // Outputs are blob: URLs, which the browser keeps alive for the whole page
     // unless revoked. Release every URL this engine handed out.
-    await _ensureImageLoaded();
+    //
+    // If the engine never loaded it never minted a URL, so there is nothing to
+    // free — don't fetch the script just to iterate an empty set.
+    if (!_engineReady) return;
     _jsRevokeAll();
   }
 
   @override
   Future<void> releaseOutput(String path) async {
-    await _ensureImageLoaded();
+    if (!_engineReady) return;
     _jsRevoke(path);
   }
 
@@ -285,80 +364,5 @@ class FlutterCompressWeb extends FlutterCompressPlatform {
   int _clampDuration(int full, VideoCompressConfig c) {
     final t = c.trim;
     return t != null ? (t.endMs - t.startMs) : full;
-  }
-}
-
-/// Dart port of the native SizeMath — kept in sync so web hits the same targets.
-class _SizeMath {
-  static const _safety = 0.95;
-  static const _minBps = 100000;
-
-  static int videoBitrateBps(
-      VideoCompressConfig c, int durationMs, int srcKbps, int targetHeight) {
-    final target = c.targetSizeMB;
-    if (target != null) {
-      final totalBits = target * 8 * 1024 * 1024;
-      final durSec = (durationMs / 1000).clamp(0.001, double.infinity);
-      // Web v1 drops audio, so the whole budget goes to video.
-      final videoBits = totalBits * _safety;
-      return (videoBits / durSec).round().clamp(_minBps, 1 << 30);
-    }
-    final explicit = c.videoBitrateKbps;
-    if (explicit != null) return explicit * 1000;
-
-    final percent =
-        (c.qualityPercent ?? _presetPercent(c.quality)).clamp(1, 100);
-    final srcBps = srcKbps * 1000;
-    if (srcBps > 0) {
-      return (srcBps * percent / 100).round().clamp(_minBps, srcBps);
-    }
-    final width = targetHeight * 16 ~/ 9;
-    final baseline = width * targetHeight * 30 * 0.12;
-    return (baseline * percent / 50).round().clamp(_minBps, 1 << 30);
-  }
-
-  static int _presetPercent(CompressQuality q) {
-    switch (q) {
-      case CompressQuality.high:
-        return 80;
-      case CompressQuality.medium:
-        return 50;
-      case CompressQuality.low:
-        return 30;
-      case CompressQuality.veryLow:
-        return 15;
-    }
-  }
-
-  static (int, int) targetDimensions(
-      int srcW, int srcH, VideoCompressConfig c) {
-    if (srcW <= 0 || srcH <= 0) return (srcW, srcH);
-    final maxW = c.maxWidth;
-    final maxH = c.maxHeight;
-    // No cap requested → keep the source exactly. Aligning here would round 1080
-    // *up* to 1088, breaking the "only ever scale down" promise and forcing a
-    // needless full-frame rescale.
-    if (maxW == null && maxH == null) return (srcW, srcH);
-
-    final m = c.alignment == DimensionAlignment.auto16 ? 16 : 2;
-    var w = srcW.toDouble();
-    var h = srcH.toDouble();
-    if (maxW != null && w > maxW) {
-      final s = maxW / w;
-      w *= s;
-      h *= s;
-    }
-    if (maxH != null && h > maxH) {
-      final s = maxH / h;
-      w *= s;
-      h *= s;
-    }
-    return (_align(w.toInt(), m), _align(h.toInt(), m));
-  }
-
-  /// Always rounds *down* so alignment can never upscale.
-  static int _align(int v, int m) {
-    final r = (v ~/ m) * m;
-    return r < m ? m : r;
   }
 }

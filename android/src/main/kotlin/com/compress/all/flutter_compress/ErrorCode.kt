@@ -21,4 +21,10 @@ internal object ErrorCode {
 
     // Plumbing.
     const val NO_ENGINE = "no_engine"
+    const val BAD_ARGUMENTS = "bad_arguments"
+    const val UNSUPPORTED = "unsupported"
 }
+
+/** A required channel argument was absent or had the wrong type. */
+internal class BadArgumentException(key: String) :
+    IllegalArgumentException("Missing or invalid argument: $key")

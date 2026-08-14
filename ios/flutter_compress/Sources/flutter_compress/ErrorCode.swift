@@ -17,4 +17,6 @@ enum ErrorCode {
 
   // Plumbing.
   static let badArguments = "bad_arguments"
+  static let noEngine = "no_engine"
+  static let unsupported = "unsupported"
 }

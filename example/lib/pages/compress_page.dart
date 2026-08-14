@@ -225,7 +225,8 @@ class _CompressPageState extends State<CompressPage> {
           final ext = result.outputPath.split('.').last;
           final saved = await _compressor.saveToDownloads(
             result.outputPath,
-            fileName: 'compressed_${DateTime.now().millisecondsSinceEpoch}.$ext',
+            fileName:
+                'compressed_${DateTime.now().millisecondsSinceEpoch}.$ext',
           );
           _appendLog(l10n.logSavedToDownloads(saved));
         } else {

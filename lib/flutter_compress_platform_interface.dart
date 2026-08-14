@@ -61,6 +61,10 @@ abstract class FlutterCompressPlatform extends PlatformInterface {
   }) =>
       throw UnimplementedError('getThumbnail() has not been implemented.');
 
+  /// Whether this platform can compress video at all. Always true on native;
+  /// on web it reports WebCodecs + demux/mux availability.
+  Future<bool> isSupported() async => true;
+
   Future<void> clearCache() =>
       throw UnimplementedError('clearCache() has not been implemented.');
 

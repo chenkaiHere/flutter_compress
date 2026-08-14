@@ -11,6 +11,10 @@ final class CompressionEngine {
   /// Minimum gap between progress events, matching Android's 250ms polling.
   fileprivate static let progressIntervalSec: TimeInterval = 0.25
 
+  private static let probeError = NSError(
+    domain: "flutter_compress", code: 2,
+    userInfo: [NSLocalizedDescriptionKey: "Unexpected media metadata types"])
+
   var onProgress: (([String: Any]) -> Void)?
 
   private let lock = NSLock()
@@ -18,6 +22,8 @@ final class CompressionEngine {
   private var writer: AVAssetWriter?
   private var activeId: String?
   private var cancelled = false
+  /// Set when a cancel arrives for a job that hasn't registered itself yet.
+  private var preCancelledId: String?
   private var bgTask: UIBackgroundTaskIdentifier = .invalid
 
   private let videoQueue = DispatchQueue(label: "flutter_compress.video")
@@ -32,13 +38,19 @@ final class CompressionEngine {
 
   func estimate(path: String, config: CompressionConfig) throws -> [String: Any] {
     let info = try MediaProbe.videoInfo(path: path)
-    let srcW = info["width"] as! Int
-    let srcH = info["height"] as! Int
-    let durationMs = clampDuration(info["durationMs"] as! Int64, config)
+    // Read defensively rather than force-casting: the probe's value types are an
+    // implicit cross-file contract, and a force cast would crash the host app
+    // instead of surfacing as an `estimate_failed` error.
+    guard let srcW = info["width"] as? Int,
+      let srcH = info["height"] as? Int,
+      let fullDuration = info["durationMs"] as? Int64,
+      let srcKbps = info["bitrateKbps"] as? Int
+    else { throw Self.probeError }
+    let durationMs = clampDuration(fullDuration, config)
     let (tw, th) = SizeMath.targetDimensions(srcW: srcW, srcH: srcH, config: config)
     let videoBps = SizeMath.videoBitrateBps(
       config: config, durationMs: durationMs,
-      sourceBitrateKbps: info["bitrateKbps"] as! Int, targetHeight: th)
+      sourceBitrateKbps: srcKbps, targetHeight: th)
     let audioBps = config.removeAudio ? 0 : (config.audioBitrateKbps ?? 128) * 1000
     let totalBits = Int64(videoBps + audioBps) * durationMs / 1000
     return [
@@ -58,21 +70,29 @@ final class CompressionEngine {
   ) {
     lock.lock()
     activeId = id
-    cancelled = false
+    // A cancel may have landed while this call was still queued on the work
+    // queue. Honour it instead of clearing the flag, or the export runs to
+    // completion while the caller's token reads cancelled.
+    cancelled = (preCancelledId == id)
+    preCancelledId = nil
     lock.unlock()
 
     beginBackgroundTask()
+    // The de-dup state lives outside `self` on purpose: if the engine is torn
+    // down mid-export, `finish` must still deliver `completion`, or the caller's
+    // future never resolves.
+    let finishLock = NSLock()
     var didFinish = false
     let finish: (CompressionOutcome) -> Void = { [weak self] outcome in
-      guard let self = self else { return }
-      self.lock.lock()
-      if didFinish { self.lock.unlock(); return }
+      finishLock.lock()
+      if didFinish {
+        finishLock.unlock()
+        return
+      }
       didFinish = true
-      self.activeId = nil
-      self.reader = nil
-      self.writer = nil
-      self.lock.unlock()
-      self.endBackgroundTask()
+      finishLock.unlock()
+      self?.clearActiveJob()
+      self?.endBackgroundTask()
       completion(outcome)
     }
 
@@ -198,10 +218,12 @@ final class CompressionEngine {
       self.lock.lock(); self.reader = reader; self.writer = writer; self.lock.unlock()
 
       guard reader.startReading() else {
-        finish(.failure("Reader failed to start: \(reader.error?.localizedDescription ?? "")")); return
+        finish(.failure("Reader failed to start: \(reader.error?.localizedDescription ?? "")"))
+        return
       }
       guard writer.startWriting() else {
-        finish(.failure("Writer failed to start: \(writer.error?.localizedDescription ?? "")")); return
+        finish(.failure("Writer failed to start: \(writer.error?.localizedDescription ?? "")"))
+        return
       }
       writer.startSession(atSourceTime: startTime)
 
@@ -214,7 +236,18 @@ final class CompressionEngine {
       // 60s/30fps clip, starving the UI. (Android polls every 250ms.)
       var lastEmit = Date.distantPast
       group.enter()
-      videoWriterInput.requestMediaDataWhenReady(on: videoQueue) {
+      // `[weak self]` is load-bearing, not hygiene: the writer is a stored
+      // property, the writer owns this input, and the input owns this block —
+      // capturing `self` strongly closes the ring and pins the engine (plus its
+      // encode session) for as long as the input keeps the block. Every exit
+      // path must still `markAsFinished()` + `leave()`, or `group.notify` never
+      // fires and the caller's future hangs.
+      videoWriterInput.requestMediaDataWhenReady(on: videoQueue) { [weak self] in
+        guard let self = self else {
+          videoWriterInput.markAsFinished()
+          group.leave()
+          return
+        }
         autoreleasepool {
           while videoWriterInput.isReadyForMoreMediaData {
             if self.isCancelled() {
@@ -250,7 +283,12 @@ final class CompressionEngine {
       // Audio pump.
       if let aIn = audioWriterInput, let aOut = audioReaderOutput {
         group.enter()
-        aIn.requestMediaDataWhenReady(on: audioQueue) {
+        aIn.requestMediaDataWhenReady(on: audioQueue) { [weak self] in
+          guard let self = self else {
+            aIn.markAsFinished()
+            group.leave()
+            return
+          }
           while aIn.isReadyForMoreMediaData {
             if self.isCancelled() {
               aIn.markAsFinished()
@@ -268,8 +306,11 @@ final class CompressionEngine {
         }
       }
 
-      group.notify(queue: self.videoQueue) {
-        if self.isCancelled() {
+      group.notify(queue: self.videoQueue) { [weak self] in
+        // A vanished engine is treated as a cancel: there is nobody left to hand
+        // the output to, so tear the writer down instead of finalising a file no
+        // one will read.
+        guard let self = self, !self.isCancelled() else {
           reader.cancelReading()
           writer.cancelWriting()
           try? FileManager.default.removeItem(at: outURL)
@@ -297,10 +338,17 @@ final class CompressionEngine {
                 "codec": usedCodec, "skipped": true,
               ]))
             } else {
+              // Measure the file we wrote rather than echoing the source: a short
+              // output is the signature of a truncated encode (CLAUDE.md §12.1).
+              let written = AVURLAsset(url: outURL)
+              let outDurationMs = Int64(CMTimeGetSeconds(written.duration) * 1000)
+              let hasAudio = !written.tracks(withMediaType: .audio).isEmpty
               finish(.success([
                 "id": id, "outputPath": outURL.path,
                 "originalSizeBytes": originalSize, "compressedSizeBytes": compressedSize,
-                "width": tw, "height": th, "durationMs": durationMs,
+                "width": tw, "height": th,
+                "durationMs": outDurationMs > 0 ? outDurationMs : durationMs,
+                "frameRate": fps, "hasAudio": hasAudio,
                 "codec": usedCodec, "skipped": false,
               ]))
             }
@@ -318,8 +366,19 @@ final class CompressionEngine {
     lock.lock()
     if id == nil || id == activeId {
       cancelled = true
+    } else {
+      // Either already finished, or it hasn't registered yet — remember it so
+      // `compress` starts out cancelled. Dart issues one compress at a time, so
+      // the latest id is enough (matches the Android engine).
+      preCancelledId = id
     }
     lock.unlock()
+  }
+
+  /// Cancel whatever is running. Used on engine detach, where there is no id to
+  /// target — the pumps observe `cancelled` and unwind on their own queues.
+  func cancelAll() {
+    cancel(id: nil)
   }
 
   private func isCancelled() -> Bool {
@@ -341,20 +400,42 @@ final class CompressionEngine {
     return false
   }
 
+  /// Release the finished job's reader/writer. Split out of `compress` so
+  /// `finish` can call it through an optional `self`.
+  private func clearActiveJob() {
+    lock.lock()
+    activeId = nil
+    reader = nil
+    writer = nil
+    lock.unlock()
+  }
+
   private func beginBackgroundTask() {
-    DispatchQueue.main.async {
+    DispatchQueue.main.async { [weak self] in
+      guard let self = self else { return }
+      // UIKit retains the expiration handler until the task ends, so a strong
+      // `self` here would keep the engine alive for the whole export.
       self.bgTask = UIApplication.shared.beginBackgroundTask(withName: "flutter_compress") {
-        self.endBackgroundTask()
+        [weak self] in self?.endBackgroundTask()
       }
     }
   }
 
   private func endBackgroundTask() {
-    DispatchQueue.main.async {
-      if self.bgTask != .invalid {
-        UIApplication.shared.endBackgroundTask(self.bgTask)
-        self.bgTask = .invalid
-      }
+    DispatchQueue.main.async { [weak self] in
+      guard let self = self, self.bgTask != .invalid else { return }
+      UIApplication.shared.endBackgroundTask(self.bgTask)
+      self.bgTask = .invalid
+    }
+  }
+
+  deinit {
+    // Now that the handlers above are weak, a task outstanding at dealloc would
+    // never be ended — and UIKit kills the app when one expires unended. Capture
+    // the identifier only, so this doesn't resurrect `self`.
+    let outstanding = bgTask
+    if outstanding != .invalid {
+      DispatchQueue.main.async { UIApplication.shared.endBackgroundTask(outstanding) }
     }
   }
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/services.dart';
 
 import 'flutter_compress_platform_interface.dart';
+import 'src/error_codes.dart';
 import 'src/exceptions.dart';
 import 'src/image_models.dart';
 import 'src/models.dart';
@@ -33,23 +34,34 @@ class MethodChannelFlutterCompress extends FlutterCompressPlatform {
   Future<T> _invoke<T>(
     String method,
     Map<String, dynamic> args,
-    CompressException Function(String code, String? message) wrap,
-  ) async {
+    CompressException Function(String code, String? message) wrap, {
+    required CompressException Function(String? message) onCancelled,
+  }) async {
     try {
       final res = await _method.invokeMethod<T>(method, args);
       if (res == null) {
-        throw wrap('${method}_failed', '$method returned no result');
+        // Never synthesise a code: `'${method}_failed'` would produce strings
+        // that aren't in CompressErrorCode and don't match any native code.
+        throw wrap(
+            CompressErrorCode.badArguments, '$method returned no result');
       }
       return res;
-    } on PlatformException catch (e) {
-      if (e.code == 'cancelled') throw VideoCompressCancelledException(e.message);
-      throw wrap(e.code, e.message);
+    } on PlatformException catch (e, stackTrace) {
+      // Preserve the original stack — without this, a failure's origin in the
+      // native/JS layer is lost (CLAUDE.md §3.4).
+      Error.throwWithStackTrace(
+        e.code == CompressErrorCode.cancelled
+            ? onCancelled(e.message)
+            : wrap(e.code, e.message),
+        stackTrace,
+      );
     }
   }
 
   Future<Map<dynamic, dynamic>> _invokeVideoMap(
           String method, Map<String, dynamic> args) =>
-      _invoke<Map<dynamic, dynamic>>(method, args, VideoCompressException.new);
+      _invoke<Map<dynamic, dynamic>>(method, args, VideoCompressException.new,
+          onCancelled: VideoCompressCancelledException.new);
 
   @override
   Future<VideoInfo> getVideoInfo(String path) async =>
@@ -105,16 +117,19 @@ class MethodChannelFlutterCompress extends FlutterCompressPlatform {
           'maxWidth': maxWidth,
         },
         VideoCompressException.new,
+        onCancelled: VideoCompressCancelledException.new,
       );
 
   @override
   Future<void> clearCache() => _method.invokeMethod<void>('clearCache');
 
   @override
-  Future<String> saveToDownloads(String path, String? fileName) => _invoke<String>(
+  Future<String> saveToDownloads(String path, String? fileName) =>
+      _invoke<String>(
         'saveToDownloads',
         {'path': path, 'fileName': fileName},
         VideoCompressException.new,
+        onCancelled: VideoCompressCancelledException.new,
       );
 
   // ---- images ------------------------------------------------------------
@@ -125,6 +140,7 @@ class MethodChannelFlutterCompress extends FlutterCompressPlatform {
           'getImageInfo',
           {'path': path},
           ImageCompressException.new,
+          onCancelled: ImageCompressCancelledException.new,
         ),
       );
 
@@ -145,6 +161,7 @@ class MethodChannelFlutterCompress extends FlutterCompressPlatform {
             'outputName': outputName,
           },
           ImageCompressException.new,
+          onCancelled: ImageCompressCancelledException.new,
         ),
       );
 }

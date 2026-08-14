@@ -70,7 +70,9 @@ public class FlutterCompressPlugin: NSObject, FlutterPlugin, FlutterStreamHandle
         let id = try? str("id"), let path = try? str("path")
       else {
         result(
-          FlutterError(code: ErrorCode.badArguments, message: "compress: missing id/path/config", details: nil))
+          FlutterError(
+            code: ErrorCode.badArguments,
+            message: "compress: missing id/path/config", details: nil))
         return
       }
       let outputDir = a["outputDir"] as? String, outputName = a["outputName"] as? String

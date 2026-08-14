@@ -9,9 +9,8 @@ enum PluginFiles {
   }
 
   static func clearCache() {
-    let items =
-      (try? FileManager.default.contentsOfDirectory(at: cacheDir(), includingPropertiesForKeys: nil))
-      ?? []
+    let items = (try? FileManager.default.contentsOfDirectory(
+      at: cacheDir(), includingPropertiesForKeys: nil)) ?? []
     for item in items { try? FileManager.default.removeItem(at: item) }
   }
 

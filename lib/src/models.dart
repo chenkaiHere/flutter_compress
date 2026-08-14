@@ -87,6 +87,7 @@ class VideoCompressConfig {
     this.alignment = DimensionAlignment.auto16,
     this.keepOriginalIfLarger = true,
     this.container = VideoContainer.auto,
+    this.keepAliveInBackground = true,
   })  : assert(
           qualityPercent == null ||
               (qualityPercent >= 1 && qualityPercent <= 100),
@@ -130,11 +131,31 @@ class VideoCompressConfig {
   final int? maxHeight;
 
   /// Cap the frame rate (e.g. 30). Source fps is kept if lower.
+  ///
+  /// **iOS only.** Media3 has no frame-decimating effect, so Android ignores
+  /// this; on web every decoded frame is re-encoded, so it only influences the
+  /// bitrate/keyframe maths, not the output fps. Check
+  /// [VideoCompressResult.frameRate] for what was actually produced.
   final double? frameRate;
 
+  /// Drop the audio track entirely.
+  ///
+  /// Android and iOS honour this. **Web always drops audio** in v1, so the
+  /// output has no audio regardless of this flag — see
+  /// [VideoCompressResult.hasAudio].
   final bool removeAudio;
+
+  /// Re-encode audio at this bitrate (AAC).
+  ///
+  /// **iOS only.** Media3 1.4.x exposes no audio-encoder settings on
+  /// `DefaultEncoderFactory`, so Android uses its default bitrate; web has no
+  /// audio at all. It still shapes the [targetSizeMB] budget on native.
   final int? audioBitrateKbps;
 
+  /// Encode only this window of the source.
+  ///
+  /// Android and iOS honour this. **Web does not apply it yet** (v1), though it
+  /// is still used for the bitrate budget so estimates stay consistent.
   final TrimRange? trim;
 
   final DimensionAlignment alignment;
@@ -146,6 +167,21 @@ class VideoCompressConfig {
   /// Output container. Defaults to [VideoContainer.auto] (keep the source's
   /// container where the platform can, else mp4).
   final VideoContainer container;
+
+  /// Whether the encode should survive the app being backgrounded.
+  ///
+  /// **Android:** starts a `dataSync` foreground service for the duration of the
+  /// encode, which shows a system notification. Set this to `false` for
+  /// foreground-only flows to avoid the notification — but note that Android
+  /// then suspends the encode when the app leaves the foreground. If your app
+  /// strips `FOREGROUND_SERVICE` from the merged manifest, the plugin logs and
+  /// carries on without the service rather than crashing.
+  ///
+  /// **iOS:** requests a background execution window (`beginBackgroundTask`),
+  /// which has no notification and no permission; this flag is ignored.
+  ///
+  /// **Web:** ignored — the browser tab governs this.
+  final bool keepAliveInBackground;
 
   Map<String, dynamic> toMap() => {
         'quality': quality.name,
@@ -162,6 +198,7 @@ class VideoCompressConfig {
         'alignment': alignment.name,
         'keepOriginalIfLarger': keepOriginalIfLarger,
         'container': container.name,
+        'keepAliveInBackground': keepAliveInBackground,
       };
 }
 
@@ -214,6 +251,8 @@ class VideoCompressResult {
     required this.durationMs,
     required this.codec,
     required this.skipped,
+    this.frameRate,
+    this.hasAudio,
   });
 
   final String id;
@@ -222,11 +261,27 @@ class VideoCompressResult {
   final int compressedSizeBytes;
   final int width;
   final int height;
+
+  /// Duration of the **output**. Compare it against the source to catch a
+  /// truncated encode — a platform muxer told the wrong duration will happily
+  /// produce a short file and report success.
   final int durationMs;
 
   /// The codec actually used ("h264" / "h265") — may differ from the request
   /// if a fallback occurred.
   final String codec;
+
+  /// The frame rate actually written, when the platform reports it.
+  ///
+  /// [VideoCompressConfig.frameRate] is a request that only iOS can honour, so
+  /// read this rather than assuming the cap applied. Null when unknown.
+  final double? frameRate;
+
+  /// Whether the output carries an audio track.
+  ///
+  /// Distinguishes "you asked to remove audio" from "this platform dropped it
+  /// anyway" (web v1 always does). Null when the platform doesn't report it.
+  final bool? hasAudio;
 
   /// True when compression was skipped because it would not have reduced size
   /// (see [VideoCompressConfig.keepOriginalIfLarger]); [outputPath] then points
@@ -249,6 +304,8 @@ class VideoCompressResult {
         durationMs: (m['durationMs'] as num).toInt(),
         codec: m['codec'] as String,
         skipped: m['skipped'] as bool? ?? false,
+        frameRate: (m['frameRate'] as num?)?.toDouble(),
+        hasAudio: m['hasAudio'] as bool?,
       );
 }
 

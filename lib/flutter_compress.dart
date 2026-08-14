@@ -9,6 +9,7 @@ export 'src/error_codes.dart';
 export 'src/exceptions.dart';
 export 'src/image_models.dart';
 export 'src/models.dart';
+export 'src/size_math.dart';
 
 /// A cancellation handle for one or more compression jobs.
 ///
@@ -172,6 +173,14 @@ class FlutterCompress {
   Future<void> cancelAll() => _platform.cancel(null);
 
   Future<bool> isCompressing() => _platform.isCompressing();
+
+  /// Whether **video** compression works on this platform.
+  ///
+  /// Always true on Android/iOS. On web it checks for WebCodecs and the bundled
+  /// demux/mux libraries, so call it before offering a compress action rather
+  /// than discovering the gap by catching `CompressErrorCode.unsupported`.
+  /// Image compression only needs a canvas and is always available.
+  Future<bool> isSupported() => _platform.isSupported();
 
   /// Extract a JPEG thumbnail; returns its file path.
   Future<String> getThumbnail(

@@ -11,11 +11,19 @@
  */
 (function () {
   'use strict';
+  // Idempotent: this file is injected by two independent lazy loaders (video and
+  // image). Re-running the IIFE would rebuild the namespace and wipe OUTPUT_URLS,
+  // silently turning revoke()/revokeAll() into no-ops.
+  if (window.flutterCompressWeb) return;
   const NS = {};
   window.flutterCompressWeb = NS;
 
   const cancelled = new Set();
+  /** Ids of runs currently in flight, so `cancelAll` has something to target. */
+  const active = new Set();
   NS.cancel = function (id) { if (id) cancelled.add(id); };
+  /** Cancel every in-flight run (backs Dart's `cancel()` with no id). */
+  NS.cancelAll = function () { for (const id of active) cancelled.add(id); };
 
   /** Every output object URL we created, so `revokeAll` can free them. */
   const OUTPUT_URLS = new Set();
@@ -124,6 +132,7 @@
     if (!NS.isSupported()) throw new Error('WebCodecs not supported in this browser');
     const id = cfg.id;
     cancelled.delete(id);
+    active.add(id);
 
     const buf = await fetchBuffer(url);
     const file = MP4Box.createFile();
@@ -148,6 +157,11 @@
     const srcH = vTrack.video ? vTrack.video.height : vTrack.track_height;
     const needResize = tw !== srcW || th !== srcH;
     const fps = cfg.frameRate && cfg.frameRate > 0 ? cfg.frameRate : 30;
+    // Source facts, reported back verbatim on the skipped path.
+    const srcFps = vTrack.nb_samples > 0 && vTrack.movie_duration > 0
+      ? vTrack.nb_samples / (vTrack.movie_duration / vTrack.movie_timescale)
+      : null;
+    const srcHasAudio = (info.audioTracks || []).length > 0;
 
     // Target-size mode uses constant bitrate so the output actually fills the
     // requested budget; quality mode stays variable (more efficient).
@@ -215,6 +229,9 @@
     let processed = 0;
     const keyInterval = Math.max(1, Math.round(fps * 2));
     let frameIndex = 0;
+    /// Frames the encoder actually accepted — the basis for the real output
+    /// duration, so a truncated encode can't be reported as full length.
+    let encodedFrames = 0;
 
     const decoder = new VideoDecoder({
       output: (frame) => {
@@ -231,6 +248,7 @@
         frameIndex++;
         encoder.encode(toEncode, { keyFrame });
         toEncode.close();
+        encodedFrames++;
         processed++;
         if (onProgress && (processed % 5 === 0)) {
           onProgress(Math.min(processed / totalSamples, 0.99), 0);
@@ -281,6 +299,12 @@
       while (fed < totalSamples && Date.now() < deadline && !cancelled.has(id)) {
         await new Promise((r) => setTimeout(r, 10));
       }
+      // Fail loudly rather than flushing a partial stream: a truncated video that
+      // reports success is far worse than an error the caller can retry.
+      if (fed < totalSamples && !cancelled.has(id)) {
+        throw new Error(
+          'demux timed out: fed ' + fed + ' of ' + totalSamples + ' samples');
+      }
 
       await decoder.flush();
       await encoder.flush();
@@ -294,7 +318,11 @@
           blob.size >= cfg.originalSizeBytes) {
         return {
           url: url, outputUrl: url, sizeBytes: cfg.originalSizeBytes,
-          width: srcW, height: srcH, durationMs, codec: usedCodec, skipped: true,
+          width: srcW, height: srcH, durationMs,
+          // The source is returned untouched, so report *its* codec, not the one
+          // we were going to encode with.
+          codec: (vTrack.codec || '').startsWith('hev') ? 'h265' : 'h264',
+          frameRate: srcFps, hasAudio: srcHasAudio, skipped: true,
         };
       }
 
@@ -302,7 +330,16 @@
       if (onProgress) onProgress(1, blob.size);
       return {
         url: outUrl, outputUrl: outUrl, sizeBytes: blob.size,
-        width: tw, height: th, durationMs, codec: usedCodec, skipped: false,
+        width: tw, height: th,
+        // Derived from what was actually encoded, not from the source header.
+        durationMs: encodedFrames > 0
+          ? Math.round((encodedFrames / Math.max(fps, 1)) * 1000)
+          : durationMs,
+        codec: usedCodec,
+        frameRate: fps,
+        // v1 never carries audio through; say so instead of implying otherwise.
+        hasAudio: false,
+        skipped: false,
       };
     } finally {
       // WebCodecs codecs hold hardware/GPU resources; leaking a pair per run
@@ -313,6 +350,7 @@
       // Don't let ids pile up: cancel() adds unconditionally, including for jobs
       // that had already finished.
       cancelled.delete(id);
+      active.delete(id);
     }
   };
 
@@ -454,8 +492,11 @@
   };
 
   NS.revoke = function (url) {
+    // Only revoke URLs we minted. When a result is `skipped` its outputUrl *is*
+    // the caller's input URL, and revoking that would tear down a blob we don't
+    // own — the caller would lose its own source.
+    if (!OUTPUT_URLS.delete(url)) return;
     try { URL.revokeObjectURL(url); } catch (_) {}
-    OUTPUT_URLS.delete(url);
   };
 
   /** Revoke every output this engine created (backs Dart's `clearCache`). */

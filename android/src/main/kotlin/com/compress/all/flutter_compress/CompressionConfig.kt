@@ -16,6 +16,7 @@ data class CompressionConfig(
     val trimEndMs: Long?,
     val alignment: String,
     val keepOriginalIfLarger: Boolean,
+    val keepAliveInBackground: Boolean,
 ) {
     companion object {
         fun fromMap(m: Map<String, Any?>): CompressionConfig {
@@ -36,6 +37,7 @@ data class CompressionConfig(
                 trimEndMs = (trim?.get("endMs") as? Number)?.toLong(),
                 alignment = m["alignment"] as? String ?: "auto16",
                 keepOriginalIfLarger = m["keepOriginalIfLarger"] as? Boolean ?: true,
+                keepAliveInBackground = m["keepAliveInBackground"] as? Boolean ?: true,
             )
         }
     }

@@ -24,4 +24,7 @@ abstract final class CompressErrorCode {
 
   /// The native engine wasn't initialised (plugin detached from the engine).
   static const String noEngine = 'no_engine';
+
+  /// The platform can't do this at all — e.g. a browser without WebCodecs.
+  static const String unsupported = 'unsupported';
 }

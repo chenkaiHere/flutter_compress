@@ -6,6 +6,7 @@ import android.graphics.BitmapFactory
 import android.graphics.Matrix
 import android.media.ExifInterface
 import android.os.Build
+import android.util.Log
 import java.io.ByteArrayOutputStream
 import java.io.File
 
@@ -281,10 +282,17 @@ class ImageEngine(private val context: Context) {
                 ExifInterface.ORIENTATION_NORMAL.toString(),
             )
             to.saveAttributes()
+        }.onFailure {
+            // Best-effort by design — a photo without its EXIF is still a valid
+            // result, so this must not fail the compression. But swallowing it
+            // silently left `keepExif: true` looking like it worked, with no way
+            // to tell why the metadata vanished.
+            Log.w(TAG, "keepExif: could not copy EXIF from $src", it)
         }
     }
 
     private companion object {
+        const val TAG = "FlutterCompress"
         const val MIN_QUALITY = 1
         const val MAX_QUALITY = 100
         const val MAX_DOWNSCALES = 5

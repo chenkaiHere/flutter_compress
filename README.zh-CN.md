@@ -60,8 +60,9 @@
 | 压缩(目标大小 / 码率 / 质量)            |     ✅      |     ✅     |   ✅   |
 | H.265 + 回退 H.264              |     ✅      |     ✅     |  ✅¹   |
 | 分辨率上限(`maxWidth`/`maxHeight`) |     ✅      |     ✅     |   ✅   |
-| 帧率上限(`frameRate`)             |     ⚠️     |     ✅     |   ✅   |
-| 音频:去除 / 码率                    |     ✅      |     ✅     |  ⚠️   |
+| 帧率上限(`frameRate`)             |    ❌ ²     |     ✅     |  ❌ ²  |
+| 音频:去除(`removeAudio`)          |     ✅      |     ✅     | ❌ 恒定丢弃 |
+| 音频码率(`audioBitrateKbps`)      |    ❌ ³     |     ✅     |   ❌   |
 | 裁剪(`trim`)                    |     ✅      |     ✅     |   ❌   |
 | 缩略图 / 信息 / 预估                 |     ✅      |     ✅     |   ✅   |
 | 进度 / 取消 / 批量                  |     ✅      |     ✅     |   ✅   |
@@ -70,15 +71,24 @@
 
 ¹ Web 仅在浏览器支持 WebCodecs 的 HEVC 编码时用 H.265(如 Safari、带硬件 HEVC 的 Chrome),否则自动回退 H.264。
 
+² 只有 iOS 能真正抽帧。Media3 没有抽帧效果,Web 管线对每一个解码帧都重新编码 ——
+这两端的 `frameRate` 只影响码率/关键帧计算。实际帧率请读 `result.frameRate`。
+
+³ Media3 1.4.x 不暴露任何音频编码器设置,Android 使用其默认 AAC 码率。该值仍参与
+`targetSizeMB` 的预算计算。
+
+标 ❌ 的项是**被忽略**,不是近似处理 —— 结果对象会回报实际发生了什么
+(`result.frameRate`、`result.hasAudio`、`result.durationMs`)。
+
 ### 🖼️ 图片
 
 | 能力                            |  Android   |    iOS    |  Web  |
 |-------------------------------|:----------:|:---------:|:-----:|
 | 压缩(目标大小 / 质量)                 |     ✅      |     ✅     |   ✅   |
 | JPEG / PNG / WebP             |     ✅      |     ✅     |   ✅   |
-| HEIC                          |     ⚠️     |     ✅     |   ❌   |
+| HEIC                          |    ⚠️ ¹    |     ✅     |   ❌   |
 | 分辨率上限(`maxWidth`/`maxHeight`) |     ✅      |     ✅     |   ✅   |
-| 保留 EXIF(`keepExif`)           |     ✅      |     ✅     |  ❌️   |
+| 保留 EXIF(`keepExif`)           | ⚠️ 仅 JPEG |     ✅     |   ❌   |
 | `saveToDownloads`             | MediaStore | Documents | 浏览器下载 |
 
 ¹ Android 仅在设备存在 HEIC 编码器时才写 HEIC,否则回退 JPEG(实际格式在结果中返回)。
@@ -87,7 +97,7 @@
 
 ```yaml
 dependencies:
-  flutter_compress: ^1.4.0
+  flutter_compress: ^1.5.0
 ```
 
 ## 快速上手
@@ -129,6 +139,7 @@ print('节省 ${result.savedPercent.toStringAsFixed(1)}% → ${result.outputPath
 | `alignment`                        | `auto16`(默认)对齐到 `÷16`,避免边缘伪影。              |
 | `keepOriginalIfLarger`             | 压缩无益时返回原文件。                                |
 | `container`                        | `auto`(默认)尽量保持源容器(iOS 保 `.mov`/`.mp4`;Android/Web 只能 `.mp4`),或 `mp4` 强制。 |
+| `keepAliveInBackground`            | 默认开启。Android 会起一个前台服务(带通知)以便退到后台后继续编码;只在前台压缩可设为 `false`,则不会出现通知。iOS 与 Web 忽略此项。 |
 
 ## API
 
@@ -237,18 +248,63 @@ try {
 
 ## 各平台配置
 
-- **Android** —— 最低 SDK 24,`compileSdk 36`。插件已声明 `FOREGROUND_SERVICE`、
-  `FOREGROUND_SERVICE_DATA_SYNC`、`POST_NOTIFICATIONS`,以及(API ≤ 28 下
-  `saveToDownloads` 需要的)`WRITE_EXTERNAL_STORAGE`。
+- **Android** —— 最低 SDK 24,`compileSdk 36`。共声明 4 条权限,见下方
+  [Android 权限](#android-权限);插件不会自行申请任何运行时权限。
 - **iOS** —— 最低 13.0。用 `beginBackgroundTask` 争取短暂后台时间。若想让
   `saveToDownloads` 保存的文件在「文件」App 里可见,请在 `Info.plist` 加入
   `UIFileSharingEnabled` 与 `LSSupportsOpeningDocumentsInPlace`。
 - **Web** —— 需要 WebCodecs(Chrome/Edge 94+、Safari 16.4+)。输入/输出均为
-  `blob:` URL;内置的解封装/封装 JS(约 0.2MB)首次使用时懒加载。用 `file_picker`
+  `blob:` URL;内置的解封装/封装 JS(216 KB,见
+  [THIRD_PARTY_NOTICES](assets/THIRD_PARTY_NOTICES.md))在**首次压缩视频**时才懒加载
+  —— 只压图片则完全不会下载。用 `file_picker`
   选文件并传 `xFile.path`(在 web 上就是 `blob:` URL)。
   结果下载或上传完后请**调用 `releaseOutput(result.outputPath)`** —— 否则浏览器会把
   整个编码结果在页面生命周期内一直留在内存里(`clearCache()` 可一次性释放全部)。
   可直接在 [在线 Demo](https://flutter-compress.ckdgdgdg.workers.dev/) 里试用。
+
+### Android 权限
+
+下面每一条都会通过 manifest 合并进入**你的** App,所以这里把它们逐条列清楚。插件
+自己从不申请运行时权限 —— 什么时候向用户要权限是你的产品决策。
+
+| 权限 | 用途 | 必需性 | 移除后的后果 |
+|---|---|---|---|
+| `FOREGROUND_SERVICE` | 让视频编码在 App 退到后台时继续 | 可选 | 插件打一条警告日志,继续编码,但不再有后台保护 |
+| `FOREGROUND_SERVICE_DATA_SYNC` | 同上,Android 14+ 强制要求的类型声明 | 可选 | 同上 |
+| `POST_NOTIFICATIONS` | 前台服务必须展示的那条通知 | 可选 | Android 13+ 不显示通知,编码照常进行 |
+| `WRITE_EXTERNAL_STORAGE`(`maxSdkVersion="28"`) | Android 9 及以下的 `saveToDownloads()` | 在 API ≤ 28 上用 `saveToDownloads` 时必需 | API ≤ 28 上 `saveToDownloads` 失败;API 29+ 走 MediaStore,不受影响 |
+
+**只压图片,或只在前台压缩?** 传
+`VideoCompressConfig(keepAliveInBackground: false)`,前台服务就永远不会启动,然后把
+前三条从合并后的 manifest 里移掉:
+
+```xml
+<uses-permission android:name="android.permission.FOREGROUND_SERVICE"
+    tools:node="remove" />
+<uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"
+    tools:node="remove" />
+<uses-permission android:name="android.permission.POST_NOTIFICATIONS"
+    tools:node="remove" />
+```
+
+图片压缩本来就不会启动该服务,所以纯图片场景移除这三条没有任何代价。
+
+### 原生依赖
+
+| 依赖 | 版本 | 未压缩体积 | 说明 |
+|---|---|---|---|
+| `androidx.media3:media3-transformer` 及 `-effect`、`-common`、`-muxer` | 1.4.1 | 含传递依赖(ExoPlayer 等)约 3.4 MB AAR | 视频管线。R8 会裁掉相当大一部分,请以自己的 release 包实测为准 |
+| `androidx.core:core-ktx` | 1.15.0 | 约 0.2 MB | 几乎必然已存在 —— Flutter 本身就会引入 `androidx.core` |
+| `org.jetbrains.kotlinx:kotlinx-coroutines-android` | 1.8.1 | 约 20 KB | 通常也已存在 |
+
+iOS 与 Web **不引入任何第三方原生依赖**:iOS 只用 SDK 自带的 AVFoundation 与
+ImageIO,Web 用浏览器的 WebCodecs 加两个内置 JS(体积与许可证见
+[THIRD_PARTY_NOTICES](assets/THIRD_PARTY_NOTICES.md))。
+
+版本锁的是**实测过的**那一个,而不是浮动区间。Gradle 的冲突仲裁本来就向上取,所以
+App 声明更高版本的 Media3 依然会生效 —— 但插件不会自己悄悄跟着升。(Media3 曾在
+1.x 内部改掉 `DefaultMuxer.Factory` 一个参数的语义,把每个输出都截断成 30 秒,而
+编译毫无警告。)
 
 ## 已知限制
 

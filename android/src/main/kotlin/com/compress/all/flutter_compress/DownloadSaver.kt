@@ -60,4 +60,3 @@ object DownloadSaver {
         else -> "application/octet-stream"
     }
 }
-

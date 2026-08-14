@@ -7,13 +7,13 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
-import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.coroutines.CoroutineContext
 
 /**
  * Bridges Flutter <-> the native pieces: [CompressionEngine] (transcode),
@@ -96,9 +96,10 @@ class FlutterCompressPlugin :
                 )
             }
 
-            "clearCache" -> {
+            // Deleting a cache full of multi-hundred-MB transcodes is real IO.
+            "clearCache" -> dispatch(result, ErrorCode.SAVE_FAILED, Dispatchers.IO) {
                 context.clearCompressCache()
-                result.success(null)
+                null
             }
 
             "saveToDownloads" -> dispatch(result, ErrorCode.SAVE_FAILED, Dispatchers.IO) {
@@ -107,13 +108,13 @@ class FlutterCompressPlugin :
 
             // ---- images ----
             "getImageInfo" -> dispatch(result, ErrorCode.IMAGE_INFO_FAILED) {
-                imageEngine!!.info(call.str("path"))
+                requireNotNull(imageEngine).info(call.str("path"))
             }
 
             "compressImage" -> dispatch(result, ErrorCode.IMAGE_COMPRESS_FAILED) {
-                imageEngine!!.compress(
+                requireNotNull(imageEngine).compress(
                     call.str("path"),
-                    ImageConfig.fromMap(call.argument<Map<String, Any?>>("config")!!),
+                    call.imageConfig(),
                     call.argument<String>("outputDir"),
                     call.argument<String>("outputName"),
                 )
@@ -141,20 +142,36 @@ class FlutterCompressPlugin :
             runCatching { withContext(ctx) { block() } }
                 .onSuccess { result.success(it) }
                 .onFailure { e ->
-                    if (e is CompressionCancelledException) result.error(ErrorCode.CANCELLED, e.message, null)
-                    else result.error(errorCode, e.message, null)
+                    when (e) {
+                        is CompressionCancelledException ->
+                            result.error(ErrorCode.CANCELLED, e.message, null)
+                        is BadArgumentException ->
+                            result.error(ErrorCode.BAD_ARGUMENTS, e.message, null)
+                        // Keep the native detail: it's the only clue to the origin.
+                        else -> result.error(errorCode, e.message, e.stackTraceToString())
+                    }
                 }
         }
     }
 
     // ---- argument accessors ------------------------------------------------
 
-    private fun MethodCall.str(key: String): String = argument<String>(key)!!
+    /** Missing/mistyped args must surface as [ErrorCode.BAD_ARGUMENTS], matching
+     *  iOS — `!!` here would leak an NPE as whatever the caller's error code is. */
+    private fun MethodCall.str(key: String): String =
+        argument<String>(key) ?: throw BadArgumentException(key)
     private fun MethodCall.int(key: String, default: Int): Int =
         (argument<Number>(key) ?: default).toInt()
     private fun MethodCall.long(key: String, default: Long): Long =
         (argument<Number>(key) ?: default).toLong()
 
     private fun MethodCall.config(): CompressionConfig =
-        CompressionConfig.fromMap(argument<Map<String, Any?>>("config")!!)
+        CompressionConfig.fromMap(
+            argument<Map<String, Any?>>("config") ?: throw BadArgumentException("config"),
+        )
+
+    private fun MethodCall.imageConfig(): ImageConfig =
+        ImageConfig.fromMap(
+            argument<Map<String, Any?>>("config") ?: throw BadArgumentException("config"),
+        )
 }

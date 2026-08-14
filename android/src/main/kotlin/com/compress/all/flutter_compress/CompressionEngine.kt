@@ -21,11 +21,11 @@ import androidx.media3.transformer.ProgressHolder
 import androidx.media3.transformer.TransformationRequest
 import androidx.media3.transformer.Transformer
 import androidx.media3.transformer.VideoEncoderSettings
+import kotlinx.coroutines.CancellableContinuation
+import kotlinx.coroutines.suspendCancellableCoroutine
 import java.io.File
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
-import kotlinx.coroutines.CancellableContinuation
-import kotlinx.coroutines.suspendCancellableCoroutine
 
 /**
  * Media3-Transformer video transcoder. Owns only the encode pipeline (bitrate,
@@ -110,11 +110,22 @@ class CompressionEngine(
         // mp4 regardless of the requested container.
         val outFile = context.resolveOutput(outputDir, outputName, path, "mp4")
 
+        // What the encode actually produced, as opposed to what we asked for
+        // (CLAUDE.md §12.1). Callers can only trust a request if we report back.
+        var actualFrameRate: Double? = null
+        var actualHasAudio: Boolean? = null
+        var outDurationMs = durationMs
         try {
             val export = runTransformer(
                 id, buildEditedItem(path, config, srcW, srcH, tw, th), outFile, videoMime,
-                encoderSettings(config, videoMime, videoBps),
+                encoderSettings(config, videoMime, videoBps), config.keepAliveInBackground,
             )
+            if (export.durationMs > 0) outDurationMs = export.durationMs
+            if (export.videoFrameCount > 0 && export.durationMs > 0) {
+                actualFrameRate = export.videoFrameCount * 1000.0 / export.durationMs
+            }
+            actualHasAudio = export.audioMimeType != null
+
             // A large gap here means the encoder ignored the requested bitrate, so
             // a target size won't be met — worth surfacing, but only when it's bad.
             val achieved = export.averageVideoBitrate
@@ -142,9 +153,13 @@ class CompressionEngine(
             "compressedSizeBytes" to if (skipped) originalSize else compressedSize,
             "width" to if (skipped) srcW else tw,
             "height" to if (skipped) srcH else th,
-            "durationMs" to durationMs,
+            // The *output* duration: a muxer told the wrong duration truncates
+            // the file, and reporting the source length would hide that.
+            "durationMs" to if (skipped) durationMs else outDurationMs,
             "codec" to usedCodec,
             "skipped" to skipped,
+            "frameRate" to actualFrameRate,
+            "hasAudio" to if (skipped) null else actualHasAudio,
         )
     }
 
@@ -223,6 +238,7 @@ class CompressionEngine(
         outFile: File,
         videoMime: String,
         videoEncoderSettings: VideoEncoderSettings,
+        keepAliveInBackground: Boolean,
     ): ExportResult = suspendCancellableCoroutine { cont ->
         val encoderFactory = DefaultEncoderFactory.Builder(context)
             .setRequestedVideoEncoderSettings(videoEncoderSettings)
@@ -268,7 +284,7 @@ class CompressionEngine(
         activeTransformer = transformer
         activeId = id
         activeCont = cont
-        CompressionForegroundService.start(context)
+        if (keepAliveInBackground) CompressionForegroundService.start(context)
         transformer.start(editedItem, outFile.absolutePath)
         startProgressPolling(id, outFile)
         cont.invokeOnCancellation { mainHandler.post { runCatching { transformer.cancel() } } }
