@@ -1,0 +1,34 @@
+root = true
+
+[*]
+end_of_line = lf
+insert_final_newline = true
+charset = utf-8
+trim_trailing_whitespace = true
+
+[*.{kt,kts}]
+indent_style = space
+indent_size = 4
+max_line_length = 120
+
+# ktlint's default `ktlint_official` style is a house style, not a correctness
+# checker — it rewrites signatures and expression bodies wholesale. `intellij_idea`
+# matches how this code is already written, so the linter catches real problems
+# instead of drowning them in reformatting noise.
+ktlint_code_style = intellij_idea
+
+# Flutter requires the Android package to match the plugin's Dart package name,
+# and pub package names are lower_snake_case. This rule can never be satisfied
+# here, so leaving it on would just train everyone to ignore ktlint output.
+ktlint_standard_package-name = disabled
+
+# Wrapping opinions, not defects. This code deliberately keeps short guard
+# clauses and lock/unlock pairs on one line; these rules would explode them
+# across ~100 sites and bury the checks that do find bugs. A lint gate that
+# fails 100 times on day one is a gate everyone learns to skip.
+ktlint_standard_function-signature = disabled
+ktlint_standard_class-signature = disabled
+ktlint_standard_statement-wrapping = disabled
+ktlint_standard_argument-list-wrapping = disabled
+ktlint_standard_parameter-list-wrapping = disabled
+ktlint_standard_multiline-if-else = disabled

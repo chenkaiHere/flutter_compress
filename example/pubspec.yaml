@@ -48,6 +48,9 @@ dependencies:
 dev_dependencies:
   integration_test:
     sdk: flutter
+  # Used by integration_test to materialise fixtures onto a real filesystem path,
+  # which is what the native engines take.
+  path_provider: ^2.1.0
   flutter_test:
     sdk: flutter
 

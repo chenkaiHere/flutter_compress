@@ -38,6 +38,19 @@ void main() {
         'mp4',
       );
     });
+
+    test('keepAliveInBackground defaults on and can be opted out', () {
+      // Default-on preserves the behaviour shipped before the flag existed;
+      // opting out is what lets an app drop FOREGROUND_SERVICE from its merged
+      // manifest without the encode failing (README → Android permissions).
+      expect(
+          const VideoCompressConfig().toMap()['keepAliveInBackground'], true);
+      expect(
+        const VideoCompressConfig(keepAliveInBackground: false)
+            .toMap()['keepAliveInBackground'],
+        false,
+      );
+    });
   });
 
   group('VideoCompressResult', () {
@@ -95,7 +108,8 @@ void main() {
     });
 
     test('carries the lossless flag', () {
-      const config = ImageCompressConfig(format: ImageFormat.png, lossless: true);
+      const config =
+          ImageCompressConfig(format: ImageFormat.png, lossless: true);
       final map = config.toMap();
       expect(map['lossless'], true);
       expect(map['format'], 'png');
@@ -135,9 +149,10 @@ void main() {
     });
 
     test('rejects out-of-range quality', () {
-      expect(() => ImageCompressConfig(quality: 0), throwsA(isA<AssertionError>()));
-      expect(
-          () => ImageCompressConfig(quality: 101), throwsA(isA<AssertionError>()));
+      expect(() => ImageCompressConfig(quality: 0),
+          throwsA(isA<AssertionError>()));
+      expect(() => ImageCompressConfig(quality: 101),
+          throwsA(isA<AssertionError>()));
     });
   });
 

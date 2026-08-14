@@ -1,0 +1,27 @@
+# pub stops reading .gitignore once this file exists, so every publish-time
+# exclusion has to be repeated here — keep it in sync with .gitignore.
+
+# Local Claude Code instructions — of no use to package consumers.
+CLAUDE.md
+
+# Build output & tooling
+build/
+coverage/
+.dart_tool/
+.flutter-plugins-dependencies
+**/doc/api/
+pubspec.lock
+migrate_working_dir/
+
+# Editor / OS noise
+.DS_Store
+.atom/
+.history
+.idea/
+.swiftpm/
+*.iml
+*.ipr
+*.iws
+*.class
+*.log
+*.swp

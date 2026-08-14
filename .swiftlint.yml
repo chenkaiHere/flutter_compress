@@ -1,0 +1,62 @@
+# SwiftLint config for the iOS plugin sources (CLAUDE.md §7.3).
+#
+# Runs with --strict in CI, so every warning is a build failure. Keep the rule
+# set small and justified: rules that fire on style opinions get disabled rather
+# than worked around.
+
+included:
+  - ios/flutter_compress/Sources
+
+excluded:
+  - example
+  - ios/flutter_compress/.build
+
+# §7.3 MUST NOT: force unwrap / force cast / force try. These are the reason
+# this config exists — they turn a recoverable channel error into a host crash.
+opt_in_rules:
+  - force_unwrapping
+
+analyzer_rules:
+  - unused_import
+
+line_length:
+  warning: 100
+  error: 140
+  ignores_comments: true
+
+# The engines are inherently long (a full AVAssetReader/Writer pipeline); the
+# constraint that matters is "no Flutter imports", enforced by tool/guards.sh.
+file_length:
+  warning: 500
+  error: 800
+
+function_body_length:
+  warning: 120
+  error: 200
+
+type_body_length:
+  warning: 400
+  error: 600
+
+cyclomatic_complexity:
+  warning: 20
+  error: 30
+
+identifier_name:
+  min_length:
+    warning: 2
+  # Short names that read fine in tight math/graphics code.
+  allowed_symbols: ["_"]
+  excluded:
+    - w
+    - h
+    - q
+    - id
+    - tw
+    - th
+
+disabled_rules:
+  # Trailing commas are the Dart/Kotlin style used elsewhere in this repo.
+  - trailing_comma
+  # `todo` would fail the build on tracked follow-ups.
+  - todo
