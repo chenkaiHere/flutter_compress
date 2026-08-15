@@ -1,5 +1,6 @@
 import Foundation
 
+// swiftlint:disable identifier_name
 /// Turns a `CompressionConfig` intent into concrete encoder numbers. Mirrors
 /// the Android `SizeMath` so both platforms hit the same target sizes.
 ///
@@ -8,7 +9,6 @@ import Foundation
 /// three languages, and diffing the copies against each other is the only
 /// practical way to catch drift. Renaming one platform's copy would cost more
 /// than the terse names do.
-// swiftlint:disable identifier_name
 enum SizeMath {
 
   private static let sizeSafety = 0.95
