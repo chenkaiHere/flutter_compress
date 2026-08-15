@@ -1,6 +1,6 @@
 name: flutter_compress
 description: "Native video & image compression for Android, iOS & Web — no FFmpeg. Target-size/bitrate/quality control, HEVC with H.264 fallback, live progress and cancellation."
-version: 1.5.0
+version: 1.5.1
 homepage: https://github.com/chenkaiHere/flutter_compress
 repository: https://github.com/chenkaiHere/flutter_compress
 

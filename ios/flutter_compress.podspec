@@ -16,7 +16,7 @@ and lossless modes.
   s.license          = { :file => '../LICENSE' }
   s.author           = 'ck'
   s.source           = { :path => '.' }
-  s.source_files = 'flutter_compress/Sources/flutter_compress/**/*'
+  s.source_files = 'flutter_compress/Sources/flutter_compress/**/*.swift'
   s.dependency 'Flutter'
   s.platform = :ios, '13.0'
 
