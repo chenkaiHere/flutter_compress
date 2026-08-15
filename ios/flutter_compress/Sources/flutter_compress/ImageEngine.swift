@@ -16,14 +16,14 @@ enum ImageEngine {
     guard let src = CGImageSourceCreateWithURL(URL(fileURLWithPath: path) as CFURL, nil) else {
       throw err("Cannot read image")
     }
-    let p = try probe(src)
+    let meta = try probe(src)
     let size = (try? FileManager.default.attributesOfItem(atPath: path)[.size] as? Int64) ?? 0
     return [
       "path": path,
-      "width": p.width,
-      "height": p.height,
+      "width": meta.width,
+      "height": meta.height,
       "sizeBytes": size,
-      "format": p.format,
+      "format": meta.format,
     ]
   }
 
@@ -63,7 +63,7 @@ enum ImageEngine {
     var image = try thumbnail(src, max(tw, th))
     var fitted = try fit(image, uti, lossy, quality, target, exif, minQuality)
     var tries = 0
-    while let t = target, fitted.data.count > t, tries < maxDownscales, image.width > minSide {
+    while let limit = target, fitted.data.count > limit, tries < maxDownscales, image.width > minSide {
       // Resample the image we already decoded instead of re-decoding the file.
       image = try resized(image, image.width * 3 / 4, image.height * 3 / 4)
       // A smaller image fits at least the quality the last round reached.
@@ -171,14 +171,14 @@ enum ImageEngine {
     var fw = Double(w)
     var fh = Double(h)
     if let maxW = maxW, fw > Double(maxW) {
-      let s = Double(maxW) / fw
-      fw *= s
-      fh *= s
+      let scale = Double(maxW) / fw
+      fw *= scale
+      fh *= scale
     }
     if let maxH = maxH, fh > Double(maxH) {
-      let s = Double(maxH) / fh
-      fw *= s
-      fh *= s
+      let scale = Double(maxH) / fh
+      fw *= scale
+      fh *= scale
     }
     return (max(1, Int(fw)), max(1, Int(fh)))
   }
@@ -196,6 +196,11 @@ enum ImageEngine {
   /// encode instead of a full binary search. Otherwise binary-searches
   /// `[minQuality, maxQuality)`. If even `minQuality` overflows, the oversized
   /// result comes back so the caller can downscale and retry.
+  // Seven positional parameters is over SwiftLint's threshold. They are the
+  // complete input to one quality search and are only ever passed together from
+  // two call sites; bundling them into a struct would add a type that exists
+  // solely to satisfy a counter.
+  // swiftlint:disable:next function_parameter_count
   private static func fit(
     _ image: CGImage, _ uti: String, _ lossy: Bool, _ quality: Int, _ target: Int?,
     _ exif: [CFString: Any]?, _ minQuality: Int
@@ -213,9 +218,9 @@ enum ImageEngine {
     var bestQuality = minQuality
     while lo <= hi {
       let q = (lo + hi) / 2
-      let d = try encode(image, uti, q, exif)
-      if d.count <= target {
-        best = d
+      let encoded = try encode(image, uti, q, exif)
+      if encoded.count <= target {
+        best = encoded
         bestQuality = q
         lo = q + 1
       } else {

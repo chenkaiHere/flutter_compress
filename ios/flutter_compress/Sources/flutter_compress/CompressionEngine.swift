@@ -63,6 +63,12 @@ final class CompressionEngine {
 
   // MARK: - Compress
 
+  // One linear AVFoundation pipeline: probe, build the reader, build the writer,
+  // pump both tracks, finalise. Splitting it would mean threading ~15 derived
+  // values (dimensions, bitrate, codec, fps, trim range, the `finish` closure)
+  // through helper signatures, which hides the sequence rather than clarifying
+  // it. Exempted here specifically so the limits keep applying everywhere else.
+  // swiftlint:disable:next function_body_length cyclomatic_complexity
   func compress(
     id: String, path: String, config: CompressionConfig,
     outputDir: String? = nil, outputName: String? = nil,
@@ -389,7 +395,9 @@ final class CompressionEngine {
   // MARK: - Helpers
 
   private func clampDuration(_ full: Int64, _ config: CompressionConfig) -> Int64 {
-    if let s = config.trimStartMs, let e = config.trimEndMs { return max(e - s, 1) }
+    if let start = config.trimStartMs, let end = config.trimEndMs {
+      return max(end - start, 1)
+    }
     return full
   }
 
@@ -415,8 +423,10 @@ final class CompressionEngine {
       guard let self = self else { return }
       // UIKit retains the expiration handler until the task ends, so a strong
       // `self` here would keep the engine alive for the whole export.
-      self.bgTask = UIApplication.shared.beginBackgroundTask(withName: "flutter_compress") {
-        [weak self] in self?.endBackgroundTask()
+      self.bgTask = UIApplication.shared.beginBackgroundTask(
+        withName: "flutter_compress"
+      ) { [weak self] in
+        self?.endBackgroundTask()
       }
     }
   }

@@ -2,6 +2,13 @@ import Foundation
 
 /// Turns a `CompressionConfig` intent into concrete encoder numbers. Mirrors
 /// the Android `SizeMath` so both platforms hit the same target sizes.
+///
+/// The short names below (`w`, `h`, `s`, `m`, `v`) match the Kotlin and Dart
+/// ports line for line — CLAUDE.md §12.2 makes this file one algorithm kept in
+/// three languages, and diffing the copies against each other is the only
+/// practical way to catch drift. Renaming one platform's copy would cost more
+/// than the terse names do.
+// swiftlint:disable identifier_name
 enum SizeMath {
 
   private static let sizeSafety = 0.95
@@ -80,3 +87,4 @@ enum SizeMath {
     return (down(w), down(h))
   }
 }
+// swiftlint:enable identifier_name

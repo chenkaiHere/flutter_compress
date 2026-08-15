@@ -24,8 +24,8 @@ enum MediaProbe {
     ]
   }
 
-  static func rotationDegrees(_ t: CGAffineTransform) -> Int {
-    let angle = atan2(t.b, t.a) * 180 / .pi
+  static func rotationDegrees(_ transform: CGAffineTransform) -> Int {
+    let angle = atan2(transform.b, transform.a) * 180 / .pi
     return (Int(angle.rounded()) + 360) % 360
   }
 }

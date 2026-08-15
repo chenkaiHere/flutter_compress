@@ -43,16 +43,16 @@ public class FlutterCompressPlugin: NSObject, FlutterPlugin, FlutterStreamHandle
   }
 
   public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
-    let a = call.arguments as? [String: Any] ?? [:]
+    let args = call.arguments as? [String: Any] ?? [:]
     // Throwing (rather than force-unwrapping) keeps a malformed call from
     // crashing the host app — it surfaces as a FlutterError instead.
-    func str(_ k: String) throws -> String {
-      guard let v = a[k] as? String else { throw Self.badArg(k) }
-      return v
+    func str(_ key: String) throws -> String {
+      guard let value = args[key] as? String else { throw Self.badArg(key) }
+      return value
     }
-    func map(_ k: String) throws -> [String: Any] {
-      guard let v = a[k] as? [String: Any] else { throw Self.badArg(k) }
-      return v
+    func map(_ key: String) throws -> [String: Any] {
+      guard let value = args[key] as? [String: Any] else { throw Self.badArg(key) }
+      return value
     }
 
     switch call.method {
@@ -75,7 +75,7 @@ public class FlutterCompressPlugin: NSObject, FlutterPlugin, FlutterStreamHandle
             message: "compress: missing id/path/config", details: nil))
         return
       }
-      let outputDir = a["outputDir"] as? String, outputName = a["outputName"] as? String
+      let outputDir = args["outputDir"] as? String, outputName = args["outputName"] as? String
       workQueue.async {
         self.engine.compress(
           id: id, path: path, config: config, outputDir: outputDir, outputName: outputName
@@ -96,7 +96,7 @@ public class FlutterCompressPlugin: NSObject, FlutterPlugin, FlutterStreamHandle
       }
 
     case "cancel":
-      engine.cancel(id: a["id"] as? String)
+      engine.cancel(id: args["id"] as? String)
       result(nil)
 
     case "isCompressing":
@@ -106,9 +106,9 @@ public class FlutterCompressPlugin: NSObject, FlutterPlugin, FlutterStreamHandle
       dispatch(result, ErrorCode.thumbnailFailed) {
         try Thumbnailer.generate(
           dir: PluginFiles.cacheDir(), path: try str("path"),
-          positionMs: (a["positionMs"] as? NSNumber)?.int64Value ?? 0,
-          quality: (a["quality"] as? NSNumber)?.intValue ?? 80,
-          maxWidth: (a["maxWidth"] as? NSNumber)?.intValue)
+          positionMs: (args["positionMs"] as? NSNumber)?.int64Value ?? 0,
+          quality: (args["quality"] as? NSNumber)?.intValue ?? 80,
+          maxWidth: (args["maxWidth"] as? NSNumber)?.intValue)
       }
 
     case "clearCache":
@@ -117,7 +117,7 @@ public class FlutterCompressPlugin: NSObject, FlutterPlugin, FlutterStreamHandle
 
     case "saveToDownloads":
       dispatch(result, ErrorCode.saveFailed) {
-        try DownloadSaver.save(path: try str("path"), fileName: a["fileName"] as? String)
+        try DownloadSaver.save(path: try str("path"), fileName: args["fileName"] as? String)
       }
 
     // ---- images ----
@@ -129,8 +129,8 @@ public class FlutterCompressPlugin: NSObject, FlutterPlugin, FlutterStreamHandle
         try ImageEngine.compress(
           path: try str("path"),
           config: ImageConfig(map: try map("config")),
-          outputDir: a["outputDir"] as? String,
-          outputName: a["outputName"] as? String)
+          outputDir: args["outputDir"] as? String,
+          outputName: args["outputName"] as? String)
       }
 
     default:
