@@ -40,8 +40,8 @@ enum PluginFiles {
     }
     // Never write over the input: the engines still read the source afterwards
     // (EXIF copy, size comparison), and clobbering it in place loses the original.
-    if target.standardizedFileURL.path == URL(fileURLWithPath: sourcePath).standardizedFileURL.path
-    {
+    let sourceURL = URL(fileURLWithPath: sourcePath)
+    if target.standardizedFileURL.path == sourceURL.standardizedFileURL.path {
       return target.deletingLastPathComponent().appendingPathComponent("\(base)-1.\(ext)")
     }
     return target

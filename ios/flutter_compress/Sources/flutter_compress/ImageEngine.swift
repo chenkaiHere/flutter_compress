@@ -43,9 +43,11 @@ enum ImageEngine {
     let requested = config.format ?? source.format
     var effective = requested == "webp" ? "jpeg" : requested
     var uti = self.uti(for: effective)
-    if effective == "heic"
-      && CGImageDestinationCreateWithData(NSMutableData(), uti as CFString, 1, nil) == nil
-    {
+    // Comma-separated conditions short-circuit exactly like `&&`, so the probe
+    // destination is only ever created for HEIC — and the brace stays on the
+    // last condition's line, which `&&` across two lines does not allow.
+    if effective == "heic",
+      CGImageDestinationCreateWithData(NSMutableData(), uti as CFString, 1, nil) == nil {
       effective = "jpeg"
       uti = self.uti(for: "jpeg")
     }
@@ -63,7 +65,8 @@ enum ImageEngine {
     var image = try thumbnail(src, max(tw, th))
     var fitted = try fit(image, uti, lossy, quality, target, exif, minQuality)
     var tries = 0
-    while let limit = target, fitted.data.count > limit, tries < maxDownscales, image.width > minSide {
+    while let limit = target, fitted.data.count > limit,
+      tries < maxDownscales, image.width > minSide {
       // Resample the image we already decoded instead of re-decoding the file.
       image = try resized(image, image.width * 3 / 4, image.height * 3 / 4)
       // A smaller image fits at least the quality the last round reached.
@@ -129,9 +132,9 @@ enum ImageEngine {
   /// Detect the source image's format (used when no format is requested).
   private static func sourceFormat(_ src: CGImageSource) -> String {
     switch (CGImageSourceGetType(src) as String?)?.lowercased() {
-    case let t? where t.contains("png"): return "png"
-    case let t? where t.contains("webp"): return "webp"
-    case let t? where t.contains("heic") || t.contains("heif"): return "heic"
+    case let kind? where kind.contains("png"): return "png"
+    case let kind? where kind.contains("webp"): return "webp"
+    case let kind? where kind.contains("heic") || kind.contains("heif"): return "heic"
     default: return "jpeg"
     }
   }
@@ -190,17 +193,18 @@ enum ImageEngine {
     let quality: Int
   }
 
+  // Seven positional parameters is over SwiftLint's threshold. They are the
+  // complete input to one quality search and are only ever passed together from
+  // two call sites; bundling them into a struct would add a type that exists
+  // solely to satisfy a counter. Both comment blocks must sit *above* the doc
+  // comment — anything between `///` and the declaration orphans the doc.
+  // swiftlint:disable function_parameter_count
   /// The highest-quality encode that fits `target`.
   ///
   /// Tries the ceiling first: an image that already fits costs a **single**
   /// encode instead of a full binary search. Otherwise binary-searches
   /// `[minQuality, maxQuality)`. If even `minQuality` overflows, the oversized
   /// result comes back so the caller can downscale and retry.
-  // Seven positional parameters is over SwiftLint's threshold. They are the
-  // complete input to one quality search and are only ever passed together from
-  // two call sites; bundling them into a struct would add a type that exists
-  // solely to satisfy a counter.
-  // swiftlint:disable:next function_parameter_count
   private static func fit(
     _ image: CGImage, _ uti: String, _ lossy: Bool, _ quality: Int, _ target: Int?,
     _ exif: [CFString: Any]?, _ minQuality: Int
@@ -230,6 +234,7 @@ enum ImageEngine {
     if let best = best { return Encoded(data: best, quality: bestQuality) }
     return Encoded(data: try encode(image, uti, minQuality, exif), quality: minQuality)
   }
+  // swiftlint:enable function_parameter_count
 
   private static func encode(
     _ image: CGImage, _ uti: String, _ quality: Int, _ exif: [CFString: Any]?
@@ -241,7 +246,7 @@ enum ImageEngine {
     var props: [CFString: Any] = [
       kCGImageDestinationLossyCompressionQuality: Double(quality) / 100.0
     ]
-    if let exif = exif { props.merge(exif) { a, _ in a } }
+    if let exif = exif { props.merge(exif) { existing, _ in existing } }
     CGImageDestinationAddImage(dest, image, props as CFDictionary)
     // Never return empty data: that would be written out as a 0-byte file and
     // reported as a successful 100% compression.

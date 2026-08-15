@@ -30,9 +30,9 @@ public class FlutterCompressPlugin: NSObject, FlutterPlugin, FlutterStreamHandle
     eventSink = nil
   }
 
-  public func onListen(withArguments _: Any?, eventSink events: @escaping FlutterEventSink)
-    -> FlutterError?
-  {
+  public func onListen(
+    withArguments _: Any?, eventSink events: @escaping FlutterEventSink
+  ) -> FlutterError? {
     eventSink = events
     return nil
   }
