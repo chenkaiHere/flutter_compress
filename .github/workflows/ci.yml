@@ -80,13 +80,13 @@ jobs:
           chmod +x ktlint
           ./ktlint --relative "android/src/**/*.kt"
 
-      - name: Unit tests (JVM)
-        working-directory: example/android
-        run: ./gradlew :flutter_compress:testDebugUnitTest
-
       - name: Build example APK
         working-directory: example
         run: flutter build apk --debug
+
+      - name: Unit tests (JVM)
+        working-directory: example/android
+        run: ./gradlew :flutter_compress:testDebugUnitTest
 
   ios:
     name: ios build
@@ -100,7 +100,11 @@ jobs:
           cache: true
 
       - name: SwiftLint
-        run: swiftlint --strict --config .swiftlint.yml
+        # Preinstalled on the current macOS images, but don't bet the job on it
+        # — that assumption is exactly what broke the Gradle step.
+        run: |
+          command -v swiftlint >/dev/null || brew install swiftlint
+          swiftlint --strict --config .swiftlint.yml
 
       # This is the gate that would have caught a call to a method that doesn't
       # exist on the engine — swiftc alone can't check the plugin file, because
