@@ -104,6 +104,14 @@ dependencies:
   flutter_compress: ^1.5.0
 ```
 
+## Integrate with an AI assistant
+
+Point Claude Code, Cursor, Copilot or any LLM at
+**[llm-guide.md](llm-guide.md)** — The guide walks the assistant through the complete integration
+
+> Read https://raw.githubusercontent.com/chenkaiHere/flutter_compress/master/llm-guide.md
+> and add video compression to this screen.
+
 ## Quick start
 
 ```dart
