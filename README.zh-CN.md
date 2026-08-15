@@ -97,13 +97,13 @@
 
 ```yaml
 dependencies:
-  flutter_compress: ^1.5.0
+  flutter_compress: ^1.5.1
 ```
 
 ## 配合 AI 助手接入
 
 把 **[llm-guide.md](llm-guide.md)** 交给 Claude Code、Cursor、Copilot 或任意 LLM
-—— 本指南将引导助手完成整个集成过程。。
+—— 本指南将引导助手完成整个集成过程。
 
 > 读一下 https://raw.githubusercontent.com/chenkaiHere/flutter_compress/master/llm-guide.md
 > ,然后在这个页面里加上视频压缩。

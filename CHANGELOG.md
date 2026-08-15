@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.5.1
+
+- Add [`llm-guide.md`](llm-guide.md) — an integration guide for AI coding
+  assistants (Claude Code, Cursor, Copilot).
+- iOS: clearer internal names. No API or behaviour change.
+
 ## 1.5.0
 
 - iOS: fix a compile error that broke every 1.4.0 iOS build (`CompressionEngine`
