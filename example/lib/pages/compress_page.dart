@@ -222,11 +222,18 @@ class _CompressPageState extends State<CompressPage> {
         );
         if (routeToDownloads) {
           // Keep the actual output extension (auto container may yield .mov).
-          final ext = result.outputPath.split('.').last;
+          // On web `outputPath` is a `blob:` URL with no extension at all, so
+          // splitting the whole string on '.' would hand back a chunk of the
+          // URL. Look at the last path segment instead, and when there is no
+          // extension pass null — the plugin then derives one from the blob's
+          // MIME type.
+          final segment = result.outputPath.split('/').last;
+          final ext = segment.contains('.') ? segment.split('.').last : null;
           final saved = await _compressor.saveToDownloads(
             result.outputPath,
-            fileName:
-                'compressed_${DateTime.now().millisecondsSinceEpoch}.$ext',
+            fileName: ext == null
+                ? null
+                : 'compressed_${DateTime.now().millisecondsSinceEpoch}.$ext',
           );
           _appendLog(l10n.logSavedToDownloads(saved));
         } else {

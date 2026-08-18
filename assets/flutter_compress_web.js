@@ -481,7 +481,11 @@
   }
 
   NS.download = async function (url, fileName) {
-    const name = fileName || (await defaultName(url));
+    // Sanitise: a name carrying path separators (easy to produce by parsing an
+    // extension out of a blob: URL) makes the browser drop the download
+    // attribute, so the file lands with no extension at all.
+    const clean = fileName && fileName.replace(/[/\\]/g, '_').trim();
+    const name = clean || (await defaultName(url));
     const a = document.createElement('a');
     a.href = url;
     a.download = name;
