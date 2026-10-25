@@ -109,7 +109,7 @@
 
 ```yaml
 dependencies:
-  flutter_compress: ^2.0.0
+  flutter_compress: ^2.0.1
 ```
 
 ## 配合 AI 助手接入

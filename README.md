@@ -116,7 +116,7 @@ strips metadata entirely — there is no way around it.
 
 ```yaml
 dependencies:
-  flutter_compress: ^2.0.0
+  flutter_compress: ^2.0.1
 ```
 
 ## Integrate with an AI assistant

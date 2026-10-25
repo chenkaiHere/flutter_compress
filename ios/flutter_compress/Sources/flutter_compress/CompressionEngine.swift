@@ -134,8 +134,29 @@ final class CompressionEngine {
 
       // Reader with a video composition — this bakes in rotation and scales to
       // the target render size in one pass.
+      //
+      // `propertiesOf:` sizes its layer transform for the source's full render
+      // size; shrinking renderSize alone would crop that frame to its top-left
+      // corner. So the upright frame is scaled down to the render size, after
+      // moving it back to the origin: not every preferredTransform carries that
+      // translation.
       let composition = AVMutableVideoComposition(propertiesOf: asset)
       composition.renderSize = CGSize(width: tw, height: th)
+      let upright = CGRect(origin: .zero, size: videoTrack.naturalSize)
+        .applying(videoTrack.preferredTransform)
+      let instruction = AVMutableVideoCompositionInstruction()
+      instruction.timeRange = CMTimeRange(start: .zero, duration: asset.duration)
+      let layer = AVMutableVideoCompositionLayerInstruction(assetTrack: videoTrack)
+      layer.setTransform(
+        videoTrack.preferredTransform
+          .concatenating(CGAffineTransform(translationX: -upright.minX, y: -upright.minY))
+          .concatenating(
+            CGAffineTransform(
+              scaleX: CGFloat(tw) / CGFloat(max(srcW, 1)),
+              y: CGFloat(th) / CGFloat(max(srcH, 1)))),
+        at: .zero)
+      instruction.layerInstructions = [layer]
+      composition.instructions = [instruction]
       if config.frameRate != nil {
         composition.frameDuration = CMTime(value: 1, timescale: CMTimeScale(max(fps, 1)))
       }
@@ -146,7 +167,8 @@ final class CompressionEngine {
       reader.timeRange = timeRange
 
       let videoReaderOutput = AVAssetReaderVideoCompositionOutput(
-        videoTracks: asset.tracks(withMediaType: .video),
+        // Only the track the composition's layer instruction covers.
+        videoTracks: [videoTrack],
         videoSettings: [
           kCVPixelBufferPixelFormatTypeKey as String:
             Int(kCVPixelFormatType_420YpCbCr8BiPlanarFullRange)

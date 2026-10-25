@@ -75,6 +75,11 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
+  # Video fixtures for integration_test/ — four solid quadrants, ~21 KB
+  # each. Regenerate with tool/make_video_fixtures.swift.
+  assets:
+    - integration_test/fixtures/
+
   # To add assets to your application, add an assets section, like this:
   # assets:
   #   - images/a_dot_burr.jpeg

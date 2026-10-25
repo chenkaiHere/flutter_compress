@@ -4,11 +4,11 @@
 `flutter_compress`. Everything needed to write correct code is in this file — no
 other page needs to be fetched.
 
-**Package:** `flutter_compress` · **This guide targets:** 2.0.0
+**Package:** `flutter_compress` · **This guide targets:** 2.0.1
 **Source of truth:** <https://pub.dev/packages/flutter_compress>
 
 Before integrating, check the latest version on pub.dev and use it in
-`pubspec.yaml`. If the installed version differs from 2.0.0, prefer the
+`pubspec.yaml`. If the installed version differs from 2.0.1, prefer the
 package's own dartdoc over this file.
 
 **What it does.** Compresses **video** and **images** on Android, iOS and Web
@@ -44,7 +44,7 @@ written.
 
 ```yaml
 dependencies:
-  flutter_compress: ^2.0.0
+  flutter_compress: ^2.0.1
 ```
 
 No platform registration, no init call. The plugin registers itself.
