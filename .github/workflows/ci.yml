@@ -13,7 +13,7 @@ concurrency:
 
 env:
   # Keep in step with pubspec.yaml's `flutter:` constraint.
-  FLUTTER_VERSION: 3.44.5
+  FLUTTER_VERSION: 3.44.9
 
 jobs:
   # Fast feedback: format, analyze, test. Ordered cheapest-first.

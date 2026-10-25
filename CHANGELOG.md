@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.0.1
+
+- iOS: fix videos being **cropped instead of scaled** whenever `maxWidth` /
+  `maxHeight` required a downscale — the output had the right dimensions but
+  showed only the top-left of the frame. This hit every orientation, and both
+  `forSocialMedia()` and `maxCompression()` on typical 1080p sources. Reported by
+  @nicolai-jacobsen, fixed by @tomquas (#5).
+
 ## 2.0.0
 
 ### Breaking

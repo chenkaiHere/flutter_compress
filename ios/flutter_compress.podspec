@@ -4,7 +4,7 @@
 #
 Pod::Spec.new do |s|
   s.name             = 'flutter_compress'
-  s.version          = '2.0.0'
+  s.version          = '2.0.1'
   s.summary          = 'High-quality Flutter video & image compression with precise target-size control.'
   s.description      = <<-DESC
 Video compression via an explicit AVAssetReader/Writer pipeline (not export presets),
